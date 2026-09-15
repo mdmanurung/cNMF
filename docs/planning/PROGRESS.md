@@ -128,7 +128,8 @@ Independent confirmation has **not** been performed. Once outcomes inform redesi
 
 ## 7. Mandatory invariants
 
-- [x] Full-data all-off behavior reproduces pinned upstream within declared tolerances. *(P0-01, 2026-09-15: `norm_counts` and `consensus_spectra` bitwise identical; all artifacts within relative Frobenius 1.4e-6, inside the declared 1e-5 (D004). Caveat: there is no experimental feature to switch off yet, so this currently attests upstream-vs-upstream reproducibility only; re-verify once A/B/C exist.)*
+- [ ] Full-data all-off behavior reproduces pinned upstream within declared tolerances.
+  - **Not yet assessable — no experimental switches exist.** This invariant is about configuration `000` (A/B/C all disabled) matching an isolated upstream reference. P0-01 measured something different and weaker: upstream against its own downloaded 1.6.0 reference artifacts (`norm_counts` and `consensus_spectra` bitwise identical; worst relative Frobenius 1.4e-6, inside the declared 1e-5 of D004). That establishes the environment and the measuring apparatus, **not** this invariant. Re-assess once A/B/C exist.
 - [ ] Training data alone determine features, scales, spectra and validation conventions.
 - [ ] All observations from one donor stay in the same donor fold.
 - [ ] Held-out-cell usages use inference observations only.
@@ -191,6 +192,11 @@ Track statistical problems separately from access, dependency, hardware, and imp
 - Next task: **S0-03** — write and freeze `docs/planning/PROTOCOL.md`
 - Exact next command, once verified: none — S0-03 is a writing task. To re-enter the environment: `module load tools/miniconda/python3.10/23.3.1 && source activate cnmf_bench` (run from repo root; export `OMP_NUM_THREADS=OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=1` before any measurement)
 - Immutable artifacts not to overwrite: everything under `docs/benchmarks/registry/` (baseline evidence — `p0-01_pytest_run1.log` and `nondeterminism_probe.tsv` are the P0 gate's reproducibility evidence); `tests/test_data/**` (downloaded 1.6.0 references — hashed in `pytest_data_manifest.tsv`; **never regenerate in place**, per D005)
+- Post-session review corrections (advisor, same day, after the P0-01 commit):
+  1. **Un-ticked the invariant** "Full-data all-off behavior reproduces pinned upstream within declared tolerances" in §8. It had been ticked with a caveat that contradicted the tick. The invariant concerns configuration `000` against an isolated upstream reference; no experimental switch exists yet, so it is *not yet assessable*. What P0-01 measured is upstream against its own 1.6.0 references — a weaker, different claim
+  2. SOURCE_AUDIT §1.5.2: explained why `consensus_usages` (4.3e-07) is *cleaner* than `gene_spectra_tpm` (1.4e-06) which it is computed from — the refit is a convex NNLS with the dictionary held fixed, so it damps rather than amplifies the input perturbation. Argued, not separately verified; the verifying check is written down
+  3. D004 marked **PROVISIONAL**: 1e-5 rests on a single observation and must be confirmed or revised at P0-04, where the absolute floor for near-zero artifacts must also be chosen — before the first such artifact appears, not after
+  4. Noted in `nondeterminism_probe.py` that its hardcoded `REPO` path will break if the file moves at P0-07
 
 ## 10. Resume instruction
 

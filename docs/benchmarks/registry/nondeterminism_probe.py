@@ -31,6 +31,10 @@ import pandas as pd
 from cnmf import cNMF
 from cnmf.cnmf import load_df_from_npz
 
+# Hardcoded absolute path: this is a one-off P0-01 probe, kept in the registry as
+# evidence rather than as a maintained tool. It will break if moved. When the
+# harness gains workflow/scripts/ at P0-07, re-derive REPO from __file__ or take
+# it as a CLI argument rather than copying this line.
 REPO = "/exports/para-lipg-hpc/mdmanurung/cNMF"
 REF_DIR = os.path.join(REPO, "tests/test_data/simulated_example_data")
 COUNTS = os.path.join(REF_DIR, "filtered_counts.txt")

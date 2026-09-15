@@ -72,6 +72,7 @@ Trade-offs and negative evidence: relative error is undefined/unstable for artif
 Consequences for the baseline and active feature set: none algorithmic. Governs how P0-04 regression/corruption tests and the P0 gate's compatibility check are evaluated.
 Protocol/data versions superseded: none (PROTOCOL.md not yet written; this decision is an input to it).
 Independent confirmation needed: re-measure before relying on it for the `kullback-leibler`/`mu` solver path — all evidence so far is from `frobenius`/`cd`.
+Status: **PROVISIONAL.** The 1e-5 value is calibrated on a single observation (one artifact, one dataset, one solver). It becomes settled only when P0-04's corruption and invariance tests confirm it separates "numerically identical" from "structurally different" — those tests are precisely where a too-loose tolerance shows up, as an injected corruption that fails to trip the check. Two things must therefore be resolved at P0-04, not after: (i) confirm or revise the 1e-5 value against corruption sensitivity, and (ii) set the absolute floor for all-zero/near-zero artifacts noted in the trade-offs above **before** the first such artifact appears, since choosing it afterwards would be choosing it against a known case.
 
 ## D005 — Upstream test failure at the pinned SHA is recorded as an upstream finding, not worked around
 
