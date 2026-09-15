@@ -89,6 +89,22 @@ Consequences for the baseline and active feature set: none algorithmic.
 Protocol/data versions superseded: none.
 Independent confirmation needed: worth reporting upstream eventually; not required for this cycle.
 
+## D006 — P0-03 (simulator) is built before P0-02 (schemas), against a data contract frozen in PROTOCOL.md
+
+Date/time: 2026-09-15, S0-03 session
+Type: implementation / deviation
+Related task, feature, gate: P0-02, P0-03, gate P0
+Context: the ledger orders `P0-02 → P0-03`, so the schema and provenance layer would normally precede the simulator. The user selected a "walking skeleton, simulator first" execution order: build the simulator to full spec, then a deliberately thin split/scorer/runner to close the end-to-end loop early, then harden P0-02/P0-04/P0-05. The reason for exempting the simulator from thinness is that every later metric is scored against its ground truth — a thin simulator with the wrong donor structure would silently invalidate `program_recovery_cosine_v1`, `usage_error_v1` and the leakage tests built on top of it, and the invalidation would not be visible in any of them.
+Options considered: (a) keep ledger order, accept that no end-to-end number exists until six tasks are complete, and discover interface mistakes late; (b) build the simulator thin alongside everything else and harden it later with the rest; (c) invert P0-02 and P0-03, build the simulator to spec, and write its output contract into PROTOCOL.md *before* the simulator exists so P0-02 later formalises validation of a frozen statement rather than retrofitting one.
+Decision: (c). PROTOCOL.md §6 states the data contract normatively — orientation, dtype, units at each stage, donor-label column, ground-truth storage, data tiers, and the `dataset_manifest_hash` input list. P0-03 implements against §6. P0-02 implements *validation of* §6.
+Reason: the ordering risk in (a) is that an interface mistake made early is found only at the end; the risk in (b) is a wrong ground truth that no downstream test can detect. (c) removes the retrofit hazard that motivates the ledger's original order, because the contract is fixed in writing before either task starts.
+Guard clause: **P0-02 may not redefine PROTOCOL.md §6.** If P0-02 finds §6 inadequate, that is a protocol amendment under PROTOCOL.md §9 — a new protocol version with a new hash and its own decision entry — not a schema-layer choice. Equally, convenience discovered while writing the simulator may inform *how* §6 is validated but must not alter *what* §6 requires.
+Evidence paths and experiment IDs: `docs/planning/PROTOCOL.md` §6; approved plan at `/home/mdmanurung/.claude/plans/plan-the-next-steps-warm-tome.md`.
+Trade-offs and negative evidence: the thin split/scorer/runner written in the skeleton session is throwaway-grade by construction, and the standing risk is that it becomes load-bearing and is never hardened. Mitigation: every row it emits carries `evidence_tier: SMOKE`, and both `smoke_can_promote_feature: false` (`ablation_plan.yaml`) and `allow_scientific_promotion: false` (`smoke.yaml`) make such rows unusable for any adoption decision. The P0 gate cannot close while the thin components stand.
+Consequences for the baseline and active feature set: none algorithmic. No `src/cnmf/**` change. Affects task order only.
+Protocol/data versions superseded: none. PROTOCOL.md v1 is the first version.
+Independent confirmation needed: none. This is an execution-order decision, not a scientific one.
+
 ## Entry template
 
 ### D<id> — <title>

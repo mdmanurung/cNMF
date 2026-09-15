@@ -35,6 +35,11 @@ features:
   B: false
   C: false
 source_pins:
-  cnmf_full_commit_sha: null
+  # Resolved at S0-01/S0-02: local HEAD is byte-identical to dylkot/cNMF HEAD
+  # (git ls-remote == git rev-parse HEAD), so this checkout IS the pinned upstream
+  # reference, not a fork of it. cNMF 1.7.1. See DECISIONS.md D002.
+  cnmf_full_commit_sha: 5dbc5baaa0b9079b55bce554d801caa235a50457
+  # Still null: the optional GeneNMF R comparator is not part of this cycle and its
+  # source has not been resolved. Must be pinned before any GeneNMF row is written.
   genenmf_full_commit_sha: null
 # Scientific gates and source-pinning guards must distinguish smoke from confirmation.

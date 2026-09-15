@@ -2,16 +2,16 @@
 
 **Specification prepared:** 15 September 2026  
 **Target repository:** `dylkot/cNMF`  
-**Current state:** IN_PROGRESS — S0-01/S0-02 and P0-01 closed; upstream reproduced within a declared tolerance; S0-03 (protocol freeze) is next  
-**Important:** No target-package code has been modified and no scientific benchmarks have been run. S0-01/S0-02 produced an audit only.
+**Current state:** IN_PROGRESS — S0 closed and the protocol frozen at v1; upstream reproduced within a declared tolerance; P0-03 (simulator) is next  
+**Important:** No target-package code has been modified and no scientific benchmarks have been run. S0 produced an audit and a frozen protocol; nothing yet produces a benchmark number.
 
 ## 1. Session dashboard
 
 | Field | Current value |
 |---|---|
-| Active prototype | P0 — baseline reproduced; next is S0-03 (protocol freeze) |
+| Active prototype | P0 — baseline reproduced, protocol frozen; next is the simulator (P0-03) |
 | Active task | None |
-| Next task | **S0-03** — write and freeze `docs/planning/PROTOCOL.md` (see §10 and the approved plan) |
+| Next task | **P0-03** — implement the simulator to spec, against the data contract frozen in PROTOCOL.md §6 (task order inverted vs the ledger by D006; see §10) |
 | Implementing agent/session | Claude Code session, 2026-09-15 |
 | Local checkout | `/exports/para-lipg-hpc/mdmanurung/cNMF`, branch `main` |
 | Environment | conda env `cnmf_bench` (Python 3.10.20, cnmf 1.7.1 editable from this checkout, BLAS scipy-openblas 0.3.29). Activate: `module load tools/miniconda/python3.10/23.3.1 && source activate cnmf_bench` |
@@ -19,19 +19,19 @@
 | Implementation SHA / dirty patch hash | **`5f22d55caf2060d48af3877f8e1a57bf051c0e34`** — first harness commit (planning bundle + P0-01 evidence), parent `5dbc5ba…` (pinned upstream). Local only, **not pushed**. `src/cnmf/**` unmodified: `git diff 5dbc5ba..HEAD -- src/` is empty. Note this row names the commit *containing* the evidence; the row itself necessarily lands in the following commit |
 | Environment lock hash | conda `4b79d3c18a7c2cc555a1755140579a82bdddbdc7d96c2eb2eef9b0ca0052e83b`, pip `e5082a753229bbde7e2c469bfcdf46786289522b5f51784a7594aa50b60c86b9` (`docs/benchmarks/registry/env_cnmf_bench.{conda,pip}.txt`) |
 | Reproducibility tolerance | Relative Frobenius error < **1e-5**, same-environment, per artifact (D004). Upstream's absolute `TOLERANCE=1e-4` is explicitly **not** reused. No bitwise claim across BLAS/versions/threads/platforms |
-| Protocol version/hash | NOT_FROZEN (S0-03 not started) |
-| Baseline selector specification | NOT_WRITTEN (P0-06) |
-| Recommended configuration | None — baseline not reproduced yet |
+| Protocol version/hash | **FROZEN — v1**, `docs/planning/PROTOCOL.md`, sha256 `a11c3d42e433baf2f3f4eccbf1d5e7fbfa9af7fae8df8ef23f0c1124f7d8ad77`, recorded in `ablation_plan.yaml` (`protocol.state: frozen`). `confirmation_unlocked: false` — two constants are null by design (`delta` §2, precision/recall threshold §5.2), both set on development controls at the start of P1, which creates v1.1 |
+| Baseline selector specification | **SPECIFIED, NOT RUNNABLE.** Equation and all four edge cases frozen in PROTOCOL.md §1/§1.4: `K* = max{K : silhouette(K) ≥ max silhouette − delta}` (largest-among-stable, *not* argmax — see §1.2 for why argmax would rig P1). `delta` is null, so the selector **refuses to run**. Not yet implemented in code (P0-06) |
+| Recommended configuration | None, and none is possible yet — no configuration has been evaluated. `000` is the *reference*, not a recommendation |
 | Latest evidence tier | NONE |
-| Last update by implementing agent | S0-01/S0-02 session, 2026-09-15 |
-| Session checkpoint | S0-01, S0-02 DONE (audit note written); S0-03 not started; P0-01 env build NOT_RUN (module/miniconda path identified, untried) |
+| Last update by implementing agent | S0-03 session, 2026-09-15 |
+| Session checkpoint | S0-01, S0-02, S0-03, P0-01 **DONE**. Protocol frozen at v1. P0-06 IN_PROGRESS (spec written, `delta` null, no code). Nothing that produces a benchmark number exists yet: no simulator, no splitter, no scorer; `RESULTS.tsv` and `EXPERIMENTS.tsv` are still header-only. Next: P0-03 simulator |
 
 ## 2. Progress counts
 
-**3 / 31 tasks DONE** (S0-01, S0-02, P0-01).  
-TODO: 28 · IN_PROGRESS: 0 · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
+**4 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01).  
+TODO: 26 · IN_PROGRESS: 1 (P0-06 — selector specification frozen in PROTOCOL.md §1, but `delta` is null and no code exists) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
 
-Scientific adoption remains separate and untouched: P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance. It is **not** evidence for any feature.
+Scientific adoption remains separate and untouched. P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance; S0-03 establishes the rules by which future evidence will be judged. Neither is evidence for any feature, and no benchmark number has been produced yet.
 
 States: TODO → IN_PROGRESS → VERIFY → DONE; also BLOCKED and DROPPED. Keep the denominator fixed for this scope; show dropped and blocked counts separately. Implementation completion is not scientific adoption.
 
@@ -59,13 +59,13 @@ Update status and evidence after each meaningful code/test batch. A task is DONE
 |---|---|---|---|---|---|
 | S0-01 | Setup | Inspect checkout, instructions, worktree and upstream revision | None | DONE | `git status` clean; local HEAD `5dbc5ba...` resolved identical to `dylkot/cNMF` HEAD via `git ls-remote`; recorded in DECISIONS.md D002 and SOURCE_AUDIT.md §1 |
 | S0-02 | Setup | Inspect reference code and record lessons, versions and licenses | S0-01 | DONE | `docs/planning/SOURCE_AUDIT.md` written: full read of `cnmf.py` (1298 lines) and `preprocess.py` (473 lines), dataflow trace of means/std/TPM/refits, MIT license noted. GeneNMF/other sources explicitly deferred to their gating tasks (§2-3 of audit), not pre-scaffolded |
-| S0-03 | Setup | Freeze scope and initialize benchmark/decision contracts | S0-02 | TODO | PROTOCOL.md draft; registries; baseline/reference distinctions — **not yet available** |
+| S0-03 | Setup | Freeze scope and initialize benchmark/decision contracts | S0-02 | DONE | `docs/planning/PROTOCOL.md` written and **frozen** (v1, 518 lines, sha256 `a11c3d42…f7d8ad77`), hash recorded in `ablation_plan.yaml` with `state: frozen`; all seven previously-undefined config names now defined (§1, §3, §4, §5); data contract §6 frozen ahead of the simulator (D006); hash convention §7; `cnmf_full_commit_sha` pinned in `smoke.yaml`. Margins remain null by design (§8) and `confirmation_unlocked: false` |
 | P0-01 | P0 | Reproduce pinned upstream installation, tests and example | S0-03 (inverted — see D003) | DONE | Env `cnmf_bench` built + locked (`registry/env_cnmf_bench.{conda,pip}.txt`, SOURCE_AUDIT §1.4); test data downloaded + hashed (`registry/pytest_data_manifest.tsv`, 148 files); `pytest -vs tests` run, **1 failed / 37 passed**, full log at `registry/p0-01_pytest_run1.log`; failure diagnosed to upstream's scale-blind tolerance (D004, D005) with env proven correct by bitwise-identical `norm_counts`/`consensus_spectra` and exact seed/gene-list/YAML matches; determinism measured (`registry/nondeterminism_probe.tsv`, SOURCE_AUDIT §1.5.1); reproducibility tolerance declared (D004) |
 | P0-02 | P0 | Implement data/artifact schemas, orientation and provenance checks | P0-01 | TODO | Schema tests; manifest examples; explicit expression units — **not yet available** |
-| P0-03 | P0 | Implement simulator, scenario registry and data tiers | P0-02 | TODO | Saved truth; independent realizations; sealed manifest policy — **not yet available** |
+| P0-03 | P0 | Implement simulator, scenario registry and data tiers | P0-02 (**inverted — see D006**; implements PROTOCOL.md §6 instead) | TODO | Saved truth; independent realizations; sealed manifest policy — **not yet available** |
 | P0-04 | P0 | Implement four headline metrics and corruption/invariance tests | P0-03 | TODO | Matching/usage/prediction/cost tests and corruption outcomes — **not yet available** |
 | P0-05 | P0 | Implement donor splits, frozen-panel projection and leakage tests | P0-02, P0-04 | TODO | Nested split proof; masked projection tests; normalization leakage tests — **not yet available** |
-| P0-06 | P0 | Preregister training-only baseline rank selection and evaluation protocol | P0-04, P0-05 | TODO | Selector equation and edge cases; frozen development protocol — **not yet available** |
+| P0-06 | P0 | Preregister training-only baseline rank selection and evaluation protocol | P0-04, P0-05 | IN_PROGRESS | **Specification half done at S0-03.** The selector equation, its sensitivity heuristic, and all four required edge cases (ties, degenerate/flat curve, search boundary, failed/NaN K) are written and frozen in PROTOCOL.md §1 and §1.4. **Remaining:** (a) `delta` is null and the selector must refuse to run while it is — calibration procedure frozen in §2, value set on development controls at the start of P1, creating protocol v1.1; (b) no implementation in code yet. Do not mark DONE until both are closed |
 | P0-07 | P0 | Implement smoke workflow, CI, cache/restart and local/SLURM profiles | P0-05 | TODO | End-to-end smoke; cache/restart tests; explicit SLURM status — **not yet available** |
 | P0-08 | P0 | Register a public multi-donor dataset and verify metadata | P0-02 | TODO | Accession/source, license, checksum and donor mapping; or external blocker — **not yet available** |
 | P0-09 | P0 | Implement optional pinned GeneNMF comparator and output checks | S0-02, P0-02, P0-04 | TODO | R smoke result and conversion tests; or explicit environment blocker — **not yet available** |
@@ -198,16 +198,52 @@ Track statistical problems separately from access, dependency, hardware, and imp
   3. D004 marked **PROVISIONAL**: 1e-5 rests on a single observation and must be confirmed or revised at P0-04, where the absolute floor for near-zero artifacts must also be chosen — before the first such artifact appears, not after
   4. Noted in `nondeterminism_probe.py` that its hardcoded `REPO` path will break if the file moves at P0-07
 
+### Session 2026-09-15c — S0-03: freeze the protocol (Claude Code)
+
+- Starting task and code revision: S0-03, at `26eefac` (harness) / `5dbc5ba` (upstream). `src/cnmf/**` unmodified throughout
+- Files changed: created `docs/planning/PROTOCOL.md` (**new**, 490 lines, frozen v1); edited `docs/benchmarks/configs/ablation_plan.yaml` (protocol block → `state: frozen` + sha256 + version + path), `docs/benchmarks/configs/smoke.yaml` (`cnmf_full_commit_sha` pinned; `genenmf_full_commit_sha` left null with a reason), `docs/planning/DECISIONS.md` (D006), `docs/README.md` (annotation), `docs/planning/PROGRESS.md`
+- Commands actually executed and exit codes: `sed`/`grep` reads of `cnmf.py` to verify every line number before freezing it into the protocol (0); `sha256sum docs/planning/PROTOCOL.md` (0); a YAML parse + hash-match verification script (0, **MATCH**)
+- Tests passed / failed / not run: no test suite run this session — S0-03 is a specification task. The verification performed was a hash/parse check, reported above
+- Experiment IDs and artifact paths: none. `RESULTS.tsv` and `EXPERIMENTS.tsv` remain header-only
+- Scientific findings, including negative results: none — this session produces rules, not measurements. Three design conclusions worth carrying forward:
+  1. **The baseline selector must be largest-among-stable, not argmax.** On the common curve shape where silhouette sits near 1.0 and decays slowly, plain argmax returns the smallest grid value almost every time. A baseline that always picks K=2 would be beaten trivially by feature A and the `000` vs `100` comparison would measure nothing. Frozen in PROTOCOL.md §1.2 *before* any comparison exists, which is the only time this choice can be made honestly
+  2. **The `delta` circularity is resolved without a fudge.** `delta` needs development controls; development controls need the simulator; the simulator comes after the freeze. Resolution: freeze the rule and the calibration procedure now, leave the value null, and make the selector *refuse to run* while it is null — the same pattern `ablation_plan.yaml` already applies to margins. Nothing before P1 needs it, because every A-OFF configuration is in `fixed_rank_configurations`
+  3. **`s_g` uses `ddof=1`, and this is measured rather than assumed** (PROTOCOL.md §3.2). The harness's per-gene scale must *equal* what cNMF used internally, or the transform used for scoring would sit on a different scale than the one the dictionary was learned from. Dividing the HVG-subset raw counts by `std(axis=0, ddof=1)` reproduces the reference `norm_counts` to **1.7e-14** relative Frobenius; `ddof=0` gives **2.0e-4**, four orders outside D004's tolerance. Separately, the `cnmf.py:537` sparsity-branch hazard flagged in SOURCE_AUDIT §1.2 is **numerically benign for `s_g`**: `sc.pp.scale(zero_center=False)` (scanpy 1.11.5) agrees with manual `ddof=1` to 6.4e-16 on both dense and CSR input, so both branches divide by the same quantity. Caught by review — the `ddof=1` claim had originally been written from recall and would have been frozen unverified
+  4. **`observation_model: poisson` in `smoke.yaml` is the simulator's generative model, not a deferred Poisson factorization backend.** Written into PROTOCOL.md §6.5 because a later session reading that key next to a brief that defers "NB/Poisson backends" would otherwise stall or implement a deferred feature
+- Decisions or deviations recorded: D006 (P0-03 before P0-02, with a guard clause forbidding P0-02 from redefining PROTOCOL.md §6)
+- Status transitions made: S0-03 TODO→DONE; P0-06 TODO→IN_PROGRESS; dashboard `Protocol version/hash` NOT_FROZEN→FROZEN v1
+- Blockers still open: B003 (`/home` 96% full — mitigated), B004 (expected upstream test failure, diagnosed and accepted)
+- Next task: **P0-03** — the simulator, built to spec against PROTOCOL.md §6
+- Exact next command, once verified: none — P0-03 starts with writing a new module. Re-enter the environment first: `module load tools/miniconda/python3.10/23.3.1 && source activate cnmf_bench` (from repo root; export `OMP_NUM_THREADS=OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=1` before any measurement)
+- Immutable artifacts not to overwrite: **`docs/planning/PROTOCOL.md` is frozen** — editing it invalidates the sha256 in `ablation_plan.yaml` and creates a new protocol version under §9, which requires a DECISIONS.md entry in the same commit. Also everything under `docs/benchmarks/registry/` and `tests/test_data/**`, as before
+
 ## 10. Resume instruction
 
 Read `AGENTS.md`, `IMPLEMENTATION_PROMPT.md`, and this tracker; inspect the existing worktree; start the next dependency-ready task without implementing deferred features. Update this file and the experiment/decision ledgers with actual evidence before ending the session. If a command cannot run, record why and keep its status NOT_RUN or BLOCKED.
 
-**Note for a cold session:** `docs/planning/contracts/` and `docs/planning/gates/` do not exist yet — only `FEATURE_CONTRACT_TEMPLATE.md` and `GATE_TEMPLATE.md` are present. Nothing in `contracts/` or `gates/` is expected before S0-03 closes.
+### The protocol is frozen — read this before touching anything
 
-The next task is **S0-03**: write `docs/planning/PROTOCOL.md`. P0-01 already ran ahead of it by deliberate decision **D003** (read that first — it carries a guard clause that environment findings must not drive scientific choices).
+`docs/planning/PROTOCOL.md` is **frozen at v1**, sha256 `a11c3d42e433baf2f3f4eccbf1d5e7fbfa9af7fae8df8ef23f0c1124f7d8ad77`, recorded in `ablation_plan.yaml`. Verify with `sha256sum docs/planning/PROTOCOL.md` before relying on it.
 
-Before writing, read in this order: `SOURCE_AUDIT.md` §1.2 (the cNMF dataflow — three distinct spectra normalizations, two std pipelines), then §1.5 (measured determinism and the declared tolerance), then DECISIONS.md D004/D005.
+Editing it is not a normal edit. Any change to a frozen rule creates a **new protocol version**, requires updating the hash in `ablation_plan.yaml` in the same commit, requires a `DECISIONS.md` entry, and invalidates any confirmation obtained under the previous version (PROTOCOL.md §9). Changes justified by outer-test or confirmation results are **forbidden**, not merely discouraged.
 
-The transform question flagged in §1.2 is **settled**: `docs/benchmarks/configs/ablation_plan.yaml` sets `test_library_total_normalization: forbidden`, and TPM-normalising a held-out cell uses its total across *all* genes — including validation-panel genes — which would leak validation information into the inference panel. So scoring uses the HVG-panel / `median_spectra` route, not all-gene / `spectra_tpm`.
+Two constants are **null by design** and stay null until P1: `delta` (the baseline selector's stability tolerance, §2) and the precision/recall threshold (§5.2). Both make their consumer **refuse to run** rather than fall back to a default. Do not "fix" this by supplying a default — that would be choosing a constant after seeing the data. Their calibration procedure is already frozen in §2.
 
-PROTOCOL.md must define the seven names the configs reference but nothing defines: `preregistered_training_only_baseline_surrogate` (the largest item — the K-selection rule feature A competes against; a weak baseline would invalidate P1), `training_scale_squared_prediction_error`, `equal_donor_mean`, `nonnegative_least_squares_frozen_dictionary`, `transform: training_fitted_and_leakage_audited`, `fixed_gene_panels`, and the `metric`/`metric_definition_version` vocabulary — plus a hash convention. Numerical margins stay **null** here; they belong in `contracts/{A,B,C}.md`.
+### The next task is P0-03: the simulator
+
+Task order is inverted against the ledger by **decision D006** — read it first, it carries a guard clause. P0-03 runs before P0-02 because every later metric is scored against the simulator's ground truth, so a thin or wrong simulator would silently invalidate everything built on it, in a way no downstream test could detect.
+
+P0-03 implements **PROTOCOL.md §6**, written before the simulator exists precisely so the contract is fixed in advance: orientation (cells × genes), dtypes, units at each stage, `obs['donor_id']` as the donor label, ground truth stored alongside the counts (never inside them), the three data tiers, and the `dataset_manifest_hash` input list. **P0-02 may not later redefine §6** — if §6 turns out inadequate, that is a protocol amendment, not a schema-layer choice.
+
+Deliverables: donor-structured Poisson counts (smoke sizes 8 donors × 30 cells × 180 genes, 3 true programs); saved true spectra and true usages; genuinely independent `simulation_replicate` draws (not reseeded reruns of the same structure); the three tiers with the **sealed manifest policy written now**, while nothing is tempted to peek; and the scenario registry with `base_identifiable` implemented and `A_weak` / `A_null` scaffolded for P1.
+
+`observation_model: poisson` in `smoke.yaml` is the **simulator's** generative model, not the deferred NB/Poisson factorization backend. The factorization loss stays `frobenius`. See PROTOCOL.md §6.5 — this trap is documented because it will otherwise cost a session.
+
+After P0-03 comes the walking skeleton (thin split + NNLS scorer + runner → the first `RESULTS.tsv` rows at `evidence_tier: SMOKE`), then P0-02 / P0-04 / P0-05 hardening, then the P0 gate, then P1/A. The user's target is the first `000` vs `100` comparison. Approved plan: `/home/mdmanurung/.claude/plans/plan-the-next-steps-warm-tome.md`.
+
+### Standing notes
+
+- `docs/planning/contracts/` and `docs/planning/gates/` still do not exist — only the two templates. `contracts/A.md` is due before any P1 evaluation; `gates/P0.md` before the P0 gate closes.
+- Background reading order for any scoring work: `SOURCE_AUDIT.md` §1.2 (three distinct spectra normalizations, two std pipelines), then §1.5 (measured determinism, declared tolerance), then D004 (**provisional** — the 1e-5 tolerance must be confirmed or revised at P0-04, where the absolute floor for near-zero artifacts must also be chosen) and D005.
+- The transform question once flagged in §1.2 is **settled** and written into PROTOCOL.md §3.1: scoring uses the HVG-panel / `median_spectra` route, never all-gene / `spectra_tpm`, because TPM-normalising a held-out cell divides by its total across *all* genes including its validation panel.
+- `src/cnmf/**` has not been modified and should not be. A, B and C arrive as harness-side switches.

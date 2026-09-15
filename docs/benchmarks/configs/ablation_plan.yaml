@@ -3,8 +3,18 @@
 schema_version: 1
 scope: first_cycle_A_B_C
 protocol:
-  state: draft
-  sha256: null
+  # Frozen at S0-03, 2026-09-15. sha256 is over the bytes of docs/planning/PROTOCOL.md
+  # (artifact-hash rule, PROTOCOL.md section 7). Verify with:
+  #   sha256sum docs/planning/PROTOCOL.md
+  # Any edit to that file invalidates this hash and creates a new protocol version
+  # (PROTOCOL.md section 9) — update this value in the same commit as the edit.
+  state: frozen
+  version: 1
+  path: docs/planning/PROTOCOL.md
+  sha256: a11c3d42e433baf2f3f4eccbf1d5e7fbfa9af7fae8df8ef23f0c1124f7d8ad77
+  # Confirmation stays locked: PROTOCOL.md leaves `delta` (the baseline selector's
+  # stability tolerance) and the precision/recall threshold null by design, both are
+  # set on development controls at the start of P1, and no margin below is set yet.
   confirmation_unlocked: false
 
 feature_definitions:

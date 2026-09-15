@@ -30,6 +30,25 @@ For subsequent sessions:
 | `benchmarks/configs/smoke.yaml` | Proposed small smoke settings, not scientific evidence or current executable software |
 | `SHA256SUMS.txt` | Integrity checksums of the bundle files |
 
+> **Annotation added 2026-09-15 (S0-03), not part of the original bundle.**
+>
+> Two discrepancies between this table and the checkout, recorded rather than silently fixed:
+>
+> 1. **`SHA256SUMS.txt` was never shipped.** No such file exists anywhere in this repository. The
+>    bundle's integrity was therefore never verifiable from within it. No replacement has been
+>    generated, deliberately: the bundle is actively changing as the programme runs, so a checksum
+>    file written now would certify the current working state rather than the delivered one, which
+>    is the opposite of what the row promises. Per-file provenance that *is* trustworthy lives in
+>    `benchmarks/registry/` (environment locks, test-data manifest) and in `planning/PROGRESS.md`.
+> 2. **Paths in this table are bundle-root-relative and no longer match the tree.** Decision D001
+>    kept the planning bundle under `docs/`, so every `planning/…` and `benchmarks/…` path above
+>    reads `docs/planning/…` and `docs/benchmarks/…` in this checkout. The same applies to the
+>    launcher message above and to the layout block in `IMPLEMENTATION_PROMPT.md:69`. New
+>    executable trees go at the repository root, not under `docs/`.
+>
+> Files added since the bundle was written: `planning/PROTOCOL.md` (S0-03, frozen benchmark and
+> selection rules) and `benchmarks/registry/` (P0-01 evidence).
+
 The new command interface, workflows, tests and modules described by the prompt must still be implemented. Null source pins and scientific margins are intentional: the agent must resolve and preregister them, not invent them. Original legacy cNMF commands remain the compatibility anchor.
 
 ## First cycle
