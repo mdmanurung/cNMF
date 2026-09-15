@@ -102,3 +102,16 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# --- cNMF benchmark harness (see docs/planning/PROGRESS.md) ---
+# Downloaded upstream pytest fixtures (~99MB). Provenance is tracked instead by
+# docs/benchmarks/registry/pytest_data_manifest.tsv; re-fetch with download_pytest_data.py
+tests/test_data/
+
+# Generated benchmark artifacts and scratch runs. Small manifests under
+# docs/benchmarks/registry/ ARE tracked; the bulk artifacts they point to are not.
+results/exploratory/
+results/scratch/
+
+# Registry holds gate evidence and must survive the blanket *.log rule above.
+!docs/benchmarks/registry/*.log

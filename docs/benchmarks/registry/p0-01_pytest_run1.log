@@ -1,0 +1,160 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.20, pytest-9.1.1, pluggy-1.6.0 -- /exports/archive/hg-funcgenom-research/mdmanurung/conda/envs/cnmf_bench/bin/python3.10
+cachedir: .pytest_cache
+rootdir: /exports/para-lipg-hpc/mdmanurung/cNMF
+configfile: pyproject.toml
+collecting ... collected 38 items
+
+tests/test_prepare.py::test_prepare[True-int64-txt] PASSED
+tests/test_prepare.py::test_prepare[True-int64-npz] PASSED
+tests/test_prepare.py::test_prepare[True-int64-h5ad] PASSED
+tests/test_prepare.py::test_prepare[True-float32-txt] PASSED
+tests/test_prepare.py::test_prepare[True-float32-npz] PASSED
+tests/test_prepare.py::test_prepare[True-float32-h5ad] PASSED
+tests/test_prepare.py::test_prepare[True-float64-txt] PASSED
+tests/test_prepare.py::test_prepare[True-float64-npz] PASSED
+tests/test_prepare.py::test_prepare[True-float64-h5ad] PASSED
+tests/test_prepare.py::test_prepare[False-int64-txt] PASSED
+tests/test_prepare.py::test_prepare[False-int64-npz] PASSED
+tests/test_prepare.py::test_prepare[False-int64-h5ad] PASSED
+tests/test_prepare.py::test_prepare[False-float32-txt] PASSED
+tests/test_prepare.py::test_prepare[False-float32-npz] PASSED
+tests/test_prepare.py::test_prepare[False-float32-h5ad] PASSED
+tests/test_prepare.py::test_prepare[False-float64-txt] PASSED
+tests/test_prepare.py::test_prepare[False-float64-npz] PASSED
+tests/test_prepare.py::test_prepare[False-float64-h5ad] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[True-int64-txt] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[True-int64-npz] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[True-int64-h5ad] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[True-float32-txt] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[True-float32-npz] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[True-float32-h5ad] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[True-float64-txt] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[True-float64-npz] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[True-float64-h5ad] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[False-int64-txt] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[False-int64-npz] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[False-int64-h5ad] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[False-float32-txt] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[False-float32-npz] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[False-float32-h5ad] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[False-float64-txt] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[False-float64-npz] PASSED
+tests/test_prepare.py::test_prepare_raises_on_zero_count_cells[False-float64-h5ad] PASSED
+tests/test_reproducibility.py::test_cnmf_end_to_end[dataset_config0] 
+
+PASSES: ./tests/test_data/simulated_example_data/example_cNMF/cnmf_tmp/example_cNMF.spectra.k_7.dt_0_1.consensus.df.npz. RMS: 0.0
+PASSES: ./tests/test_data/simulated_example_data/example_cNMF/cnmf_tmp/example_cNMF.usages.k_7.dt_0_1.consensus.df.npz. RMS: 2.52465195466682e-10
+PASSES: ./tests/test_data/simulated_example_data/example_cNMF/cnmf_tmp/example_cNMF.gene_spectra_score.k_7.dt_0_1.df.npz. RMS: 1.24070627051746e-17
+FAILED
+tests/test_reproducibility.py::test_cnmf_end_to_end[dataset_config1] 
+
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.spectra.k_7.dt_0_1.consensus.df.npz. RMS: 0.0
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.spectra.k_8.dt_0_1.consensus.df.npz. RMS: 0.0
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.usages.k_7.dt_0_1.consensus.df.npz. RMS: 2.22134332907551e-10
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.usages.k_8.dt_0_1.consensus.df.npz. RMS: 2.16126321302038e-10
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.gene_spectra_score.k_7.dt_0_1.df.npz. RMS: 1.0297743071806e-15
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.gene_spectra_score.k_8.dt_0_1.df.npz. RMS: 1.57640359750066e-15
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.gene_spectra_tpm.k_7.dt_0_1.df.npz. RMS: 0.0
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.gene_spectra_tpm.k_8.dt_0_1.df.npz. RMS: 0.0
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.starcat_spectra.k_7.dt_0_1.df.npz. RMS: 1.40836818169645e-11
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.starcat_spectra.k_8.dt_0_1.df.npz. RMS: 1.81428020354855e-11
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.norm_counts.h5ad. RMS: 0.0
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.nmf_params.df.npz
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.nmf_idvrun_params.yaml
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/pbmc_cNMF.overdispersed_genes.txt
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.tpm.h5ad. RMS: 0.0
+PASSES: ./tests/test_data/example_PBMC/pbmc_cNMF/cnmf_tmp/pbmc_cNMF.tpm_stats.df.npz. RMS: 5.17939070544827e-05
+PASSED
+
+=================================== FAILURES ===================================
+____________________ test_cnmf_end_to_end[dataset_config0] _____________________
+
+cnmf_instance = <cnmf.cnmf.cNMF object at 0x7fe42597d690>
+dataset_config = {'name': 'example_cNMF', 'counts_file': './tests/test_data/simulated_example_data/filtered_counts.txt', 'k_values': array([5, 6, 7]), 'n_iter': 15, ...}
+tmp_path = PosixPath('/tmp/pytest-of-mdmanurung/pytest-0/test_cnmf_end_to_end_dataset_c0')
+
+    @pytest.mark.parametrize("dataset_config", [
+        {
+            "name": "example_cNMF",
+            "counts_file": "./tests/test_data/simulated_example_data/filtered_counts.txt",
+            "k_values": np.arange(5,8),
+            "n_iter": 15,
+            "nhvg": 1000,
+            "seed": 14,
+            "reference_dir": "./tests/test_data/simulated_example_data",
+            "consensus":[(7, 0.1)]
+        },
+        {
+            "name": "pbmc_cNMF",
+            "counts_file": "./tests/test_data/example_PBMC/counts.h5ad",
+            "k_values": np.arange(7,10),
+            "n_iter": 15,
+            "nhvg": 1000,
+            "seed": 14,
+            "reference_dir": "./tests/test_data/example_PBMC",
+            "consensus":[(7, 0.1), (8, 0.1)]
+        },
+    ])
+    def test_cnmf_end_to_end(cnmf_instance, dataset_config, tmp_path):
+        """
+        Single end-to-end test that runs the cNMF pipeline for multiple example datasets.
+        """
+    
+        cnmf_instance.prepare(
+            counts_fn=dataset_config["counts_file"],
+            components=dataset_config["k_values"],
+            n_iter=dataset_config["n_iter"],
+            num_highvar_genes=dataset_config["nhvg"],
+            seed=dataset_config["seed"]
+        )
+    
+        #Rather than re-running factorization, we simply copy the combined files
+        for K in dataset_config["k_values"]:
+            test_fn = cnmf_instance.paths['merged_spectra'] % K
+            ref_fn = test_fn.replace(cnmf_instance.output_dir, dataset_config['reference_dir']).replace('test_cNMF', dataset_config['name'])
+            shutil.copy(ref_fn, test_fn)
+    
+        for K, ldthresh in dataset_config["consensus"]:
+            cnmf_instance.consensus(k=K, density_threshold=ldthresh, show_clustering=False)
+    
+        print('\n')
+        # Test Consensus results
+        for fn in ['consensus_spectra', 'consensus_usages', 'gene_spectra_score', 'gene_spectra_tpm', 'starcat_spectra']:
+            test_base = cnmf_instance.paths[fn]
+            ref_base = test_base.replace(cnmf_instance.output_dir, dataset_config['reference_dir']).replace('test_cNMF', dataset_config['name'])
+            for K, ldthresh in dataset_config["consensus"]:
+                ldthresh_str = str(ldthresh).replace('.', '_')
+                test_fn = test_base % (K, ldthresh_str)
+                ref_fn = ref_base % (K, ldthresh_str)
+                assert os.path.exists(test_fn), (
+                    f"Missing output file {test_fn} for dataset {dataset_config['name']}"
+                )
+                assert os.path.exists(test_fn), (
+                    f"Missing reference comparison file {ref_fn} for dataset {dataset_config['name']}"
+                )
+                test_df = load_df_from_npz(test_fn)
+                orig_df = load_df_from_npz(ref_fn)
+                rms = ((test_df - orig_df)**2).sum().sum()
+>               assert (rms < TOLERANCE), (
+                    f"{ref_fn} does not match."
+                )
+E               AssertionError: ./tests/test_data/simulated_example_data/example_cNMF/cnmf_tmp/example_cNMF.gene_spectra_tpm.k_7.dt_0_1.df.npz does not match.
+E               assert np.float64(0.07176245692742322) < 0.0001
+
+tests/test_reproducibility.py:112: AssertionError
+=============================== warnings summary ===============================
+tests/test_prepare.py: 18 warnings
+  /exports/archive/hg-funcgenom-research/mdmanurung/conda/envs/cnmf_bench/lib/python3.10/site-packages/legacy_api_wrap/__init__.py:88: UserWarning: Some cells have zero counts
+    return fn(*args_all, **kw)
+
+tests/test_reproducibility.py::test_cnmf_end_to_end[dataset_config0]
+tests/test_reproducibility.py::test_cnmf_end_to_end[dataset_config1]
+tests/test_reproducibility.py::test_cnmf_end_to_end[dataset_config1]
+  /exports/archive/hg-funcgenom-research/mdmanurung/conda/envs/cnmf_bench/lib/python3.10/site-packages/scanpy/preprocessing/_scale.py:309: UserWarning: Received a view of an AnnData. Making a copy.
+    view_to_actual(adata)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_reproducibility.py::test_cnmf_end_to_end[dataset_config0]
+================== 1 failed, 37 passed, 21 warnings in 20.11s ==================

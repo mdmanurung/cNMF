@@ -1,0 +1,64 @@
+# DESIGN TEMPLATE: no implementation or benchmarks are included in this bundle.
+# The coding agent must implement schema validation and the corresponding workflow.
+schema_version: 1
+scope: first_cycle_A_B_C
+protocol:
+  state: draft
+  sha256: null
+  confirmation_unlocked: false
+
+feature_definitions:
+  A: donor_blocked_observation_separated_predictive_rank_selection
+  B: donor_balanced_discovery
+  C: one_pass_run_aware_consensus_deduplication
+
+matched_budget_factorial:
+  bit_order: [A, B, C]
+  inactive_A_selector: preregistered_training_only_baseline_surrogate
+  inactive_B_sampling: proportional_without_replacement
+  active_B_sampling: equal_per_donor_without_replacement
+  inactive_C_consensus: upstream
+  active_C_consensus: one_per_run_per_upstream_cluster
+  hold_preprocessing_constant_across_B: true
+  hold_discovery_cells_constant_across_rank_and_optimizer_seeds: true
+  reuse_identical_factor_banks_across_C: true
+  configurations:
+    - {id: '000', A: false, B: false, C: false}
+    - {id: '100', A: true,  B: false, C: false}
+    - {id: '010', A: false, B: true,  C: false}
+    - {id: '001', A: false, B: false, C: true}
+    - {id: '110', A: true,  B: true,  C: false}
+    - {id: '101', A: true,  B: false, C: true}
+    - {id: '011', A: false, B: true,  C: true}
+    - {id: '111', A: true,  B: true,  C: true}
+  fixed_rank_configurations: ['000', '010', '001', '011']
+
+additional_anchors:
+  - id: upstream_full_data
+    description: Exact upstream pipeline on all eligible training cells; not the matched-budget 000 arm.
+  - id: genenmf_native
+    description: Optional whole-workflow comparator; not an A/B/C ablation.
+
+validation:
+  group_by: donor_id
+  keep_repeated_measurements_together: true
+  nested_donor_folds: true
+  within_test_donor_split: fixed_gene_panels
+  fit_preprocessing_on_training_only: true
+  infer_test_usages_from_inference_panel_only: true
+  score_unused_observations_only: true
+  observed_zero_is_not_missing: true
+  test_library_total_normalization: forbidden
+  test_spectra_refit: forbidden
+  primary_loss: training_scale_squared_prediction_error
+  primary_aggregation: equal_donor_mean
+
+scientific_gates:
+  require_frozen_contract: true
+  smoke_can_promote_feature: false
+  primary_minimum_worthwhile_gain: null
+  program_recovery_maximum_harm: null
+  rare_context_recovery_maximum_harm: null
+  prediction_maximum_harm: null
+  cost_cap: null
+  null_margin_policy: refuse_scientific_adoption_decision

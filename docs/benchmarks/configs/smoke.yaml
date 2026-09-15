@@ -1,0 +1,40 @@
+# DESIGN TEMPLATE ONLY: proposed smoke settings for the agent to implement.
+# These small sizes are not adequate evidence for scientific superiority.
+schema_version: 1
+profile: smoke
+evidence_tier: SMOKE
+allow_scientific_promotion: false
+seed: 1701
+scenario: base_identifiable
+simulation:
+  donors: 8
+  cells_per_donor: 30
+  genes: 180
+  true_programs: 3
+  observation_model: poisson
+  independent_replicates: 1
+factorization:
+  backend: pinned_upstream_cnmf
+  loss: frobenius
+  candidate_ranks: [2, 3, 4]
+  optimizer_starts: 3
+  max_optimizer_iterations: 300
+validation:
+  outer_donor_folds: 2
+  inner_donor_folds: 2
+  inference_gene_fraction: 0.7
+  panel_repetitions: 1
+  projection: nonnegative_least_squares_frozen_dictionary
+  transform: training_fitted_and_leakage_audited
+resources:
+  cores: 2
+  blas_threads_per_job: 1
+  memory_limit_mb: 4096
+features:
+  A: false
+  B: false
+  C: false
+source_pins:
+  cnmf_full_commit_sha: null
+  genenmf_full_commit_sha: null
+# Scientific gates and source-pinning guards must distinguish smoke from confirmation.
