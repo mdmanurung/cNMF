@@ -23,7 +23,7 @@
 | Baseline selector specification | **SPECIFIED, NOT RUNNABLE.** Equation and all four edge cases frozen in PROTOCOL.md §1/§1.4: `K* = max{K : silhouette(K) ≥ max silhouette − delta}` (largest-among-stable, *not* argmax — see §1.2 for why argmax would rig P1). `delta` is null, so the selector **refuses to run**. Not yet implemented in code (P0-06) |
 | Recommended configuration | None, and none is possible yet — no configuration has been evaluated. `000` is the *reference*, not a recommendation |
 | Latest evidence tier | NONE |
-| Last update by implementing agent | S0-03 session, 2026-09-15 |
+| Last update by implementing agent | P0-03 session, 2026-09-16 |
 | Session checkpoint | S0-01, S0-02, S0-03, P0-01 **DONE**. Protocol frozen at v1. P0-06 IN_PROGRESS (spec written, `delta` null, no code). Nothing that produces a benchmark number exists yet: no simulator, no splitter, no scorer; `RESULTS.tsv` and `EXPERIMENTS.tsv` are still header-only. Next: P0-03 simulator |
 
 ## 2. Progress counts
@@ -62,7 +62,7 @@ Update status and evidence after each meaningful code/test batch. A task is DONE
 | S0-03 | Setup | Freeze scope and initialize benchmark/decision contracts | S0-02 | DONE | `docs/planning/PROTOCOL.md` written and **frozen** (523 lines; frozen at v1, corrected to v1.0.1 in the P0-03 session, sha256 `71563989…6f4f9ca5`), hash recorded in `ablation_plan.yaml` with `state: frozen`; all seven previously-undefined config names now defined (§1, §3, §4, §5); data contract §6 frozen ahead of the simulator (D006); hash convention §7; `cnmf_full_commit_sha` pinned in `smoke.yaml`. Margins remain null by design (§8) and `confirmation_unlocked: false` |
 | P0-01 | P0 | Reproduce pinned upstream installation, tests and example | S0-03 (inverted — see D003) | DONE | Env `cnmf_bench` built + locked (`registry/env_cnmf_bench.{conda,pip}.txt`, SOURCE_AUDIT §1.4); test data downloaded + hashed (`registry/pytest_data_manifest.tsv`, 148 files); `pytest -vs tests` run, **1 failed / 37 passed**, full log at `registry/p0-01_pytest_run1.log`; failure diagnosed to upstream's scale-blind tolerance (D004, D005) with env proven correct by bitwise-identical `norm_counts`/`consensus_spectra` and exact seed/gene-list/YAML matches; determinism measured (`registry/nondeterminism_probe.tsv`, SOURCE_AUDIT §1.5.1); reproducibility tolerance declared (D004) |
 | P0-02 | P0 | Implement data/artifact schemas, orientation and provenance checks | P0-01 | TODO | Schema tests; manifest examples; explicit expression units — **not yet available** |
-| P0-03 | P0 | Implement simulator, scenario registry and data tiers | P0-02 (**inverted — see D006**; implements PROTOCOL.md §6 instead) | TODO | Saved truth; independent realizations; sealed manifest policy — **not yet available** |
+| P0-03 | P0 | Implement simulator, scenario registry and data tiers | P0-02 (**inverted — see D006**; implements PROTOCOL.md §6 instead) | IN_PROGRESS | `cnmfbench/` written: `simulate.py`, `scenarios.py`, `contract.py`, `hashing.py`, `io.py`, `diagnostics.py`; **80 tests pass** (`python -m pytest cnmfbench`), including live integration against the pinned cNMF. Saved truth, independent realizations and the sealed-manifest policy are all implemented and tested. **Open:** the donor-blocking gap is positive but not yet established — see session log 2026-09-16b |
 | P0-04 | P0 | Implement four headline metrics and corruption/invariance tests | P0-03 | TODO | Matching/usage/prediction/cost tests and corruption outcomes — **not yet available** |
 | P0-05 | P0 | Implement donor splits, frozen-panel projection and leakage tests | P0-02, P0-04 | TODO | Nested split proof; masked projection tests; normalization leakage tests — **not yet available** |
 | P0-06 | P0 | Preregister training-only baseline rank selection and evaluation protocol | P0-04, P0-05 | IN_PROGRESS | **Specification half done at S0-03.** The selector equation, its sensitivity heuristic, and all four required edge cases (ties, degenerate/flat curve, search boundary, failed/NaN K) are written and frozen in PROTOCOL.md §1 and §1.4. **Remaining:** (a) `delta` is null and the selector must refuse to run while it is — calibration procedure frozen in §2, value set on development controls at the start of P1, creating protocol v1.1; (b) no implementation in code yet. Do not mark DONE until both are closed |
@@ -234,6 +234,61 @@ Track statistical problems separately from access, dependency, hardware, and imp
 - Status transitions made: none
 - Blockers still open: B003, B004 (both unchanged)
 - Next task: **P0-03**, unchanged
+
+### Session 2026-09-16b — P0-03: the simulator, and the first executable harness code (Claude Code)
+
+- Starting task and code revision: P0-03, at `a7baf73` (harness) / `5dbc5ba` (upstream). `src/cnmf/**` unmodified throughout and re-verified byte-identical after the commit
+- Context: the programme was five sessions in with ~2700 lines of documentation and **zero harness code**. P0-03 had been "next" in three consecutive sessions. This session wrote code
+- Files created: `cnmfbench/` — `simulate.py`, `scenarios.py`, `contract.py`, `hashing.py`, `io.py`, `diagnostics.py`, plus `tests/` (5 files). Harness tests live in `cnmfbench/tests/`, **never** in `tests/`, because upstream's suite result (37 passed / 1 failed) is recorded P0-01 evidence and adding files there would destroy its value as a regression reference
+- Files edited: `PROTOCOL.md` (§1.1, v1 → v1.0.1), `ablation_plan.yaml` (version + hash), `smoke.yaml` (two config corrections), `DECISIONS.md` (D007), `SOURCE_AUDIT.md` (new §1.6), `.gitignore`
+- Commands actually executed and exit codes: `python -m pytest cnmfbench` (0 — **80 passed**); generation of all three implemented scenarios at SMOKE and DEVELOPMENT (0); `sha256sum docs/planning/PROTOCOL.md` (0); `git diff 5dbc5ba..HEAD -- src/ tests/ setup.py pyproject.toml` (empty, confirming upstream untouched); donor-eligibility sweep, 4 configs × 10 repeats (0)
+- Tests passed / failed / not run: **80 passed, 0 failed.** Includes live integration against the pinned cNMF (`prepare` → `factorize` → `combine` → `consensus`), not mocks — the claims being tested are about upstream's behaviour, and a mock would only test my reading of it
+- Experiment IDs and artifact paths: `docs/benchmarks/registry/p0-03_donor_eligibility_sweep.tsv`. **No `RESULTS.tsv` row was written** — that is the skeleton session that follows. `RESULTS.tsv` and `EXPERIMENTS.tsv` remain header-only
+
+#### Three previously specified items that had been silently dropped, now done
+
+All three were in the approved plan, approved, and then not carried out, with nothing catching it. Recorded rather than fixed quietly, because the process gap is the more durable finding: nothing cross-checks plan items against tracker state.
+
+1. `PROTOCOL.md` §1.1 listed 3 of `k_selection_stats`' 4 columns. Corrected, bumped to **v1.0.1**, hash updated in `ablation_plan.yaml`, `DECISIONS.md` D007 records that **no rule changed**, so §9's confirmation-invalidation clause is not triggered
+2. `smoke.yaml` `inference_gene_fraction` 0.7 → **0.5**
+3. This session log, and the stale `Last update by implementing agent` field
+
+Also corrected: PROGRESS.md gave PROTOCOL.md as both 518 and 490 lines in the same document. 518 was right.
+
+#### Scientific findings, including negative results
+
+1. **A fifth cNMF API trap, not found by source reading, and it had invalidated `smoke.yaml`.** `consensus` computes `n_neighbors = int(local_neighborhood_size * merged_spectra.shape[0] / k)`; since `merged_spectra` has `n_iter * k` rows this reduces to `int(0.30 * n_iter)`, **independent of k**. At `n_iter <= 3` it is zero, `local_density` divides by zero, and consensus raises `"Zero components remain after density filtering. Consider increasing density threshold"` — a message that points at the threshold, which is not the cause and cannot fix it. `smoke.yaml` had `optimizer_starts: 3`, so **every consensus call in the smoke tier would have failed**. Changed to 5. Verified for `n_iter` in {2,3,4,5,10,20} at `k` in {3,7,12}; regression test added
+2. **The reused-run-name trap is the opposite of what was recorded.** Recorded as "silently skips factorization". Measured: the `completed=True` marking and its `UserWarning` happen inside `get_nmf_iter_params`, which `prepare()` calls, so the warning fires at **prepare** time; and `factorize` defaults to `skip_completed_runs=False`, so it **re-runs** every replicate. Silent skipping needs `skip_completed_runs=True`. The live hazard with default arguments is silent **overwriting**. A fresh name per run is still required, for the other reason
+3. **Scaled-space cosine confirms the background-amplification prediction quantitatively.** True-program separation is 0.68 median / 0.80 max in the space the engine sees, against **0.54** in count space — the division by per-gene std acts as a per-gene mean normalisation, cancelling the shared background and amplifying it relative to the discriminative direction. Under the 0.7 target, so feature A is not excluded on identifiability grounds. This is why `lambda` must be tuned against measured scaled-space cosine and never a count-space formula
+4. **`donor_id` survives `.h5ad` through a real `prepare()`** into `norm_counts.h5ad`, and does **not** reach the consensus artifacts, which carry only `obs.index`. Both halves now pinned by tests, so a downstream join on the cell index is a lookup rather than a guess
+5. **AnnData coerces an integer index to strings**, closing one route to the §6.1 identifier clause. The real hazard is unaffected and is not about dtype: cNMF's `.npz`/tab-delimited readers discard `obs` columns entirely, which the donor-column clause catches
+
+#### The donor-blocking measurement — the load-bearing open question
+
+This is what decides whether feature A is testable at all, and it is **not yet settled**.
+
+- A first two-arm design compared a donor-blocked split against a random-cell split, each scored on **its own** held-out cells. That measures test-set difficulty, not donor blocking, and returned a **negative** gap. Corrected by holding the test cells fixed across arms
+- The corrected two-arm design gives a positive gap across four eligibility settings (+1.7% to +3.9%), rising as programs get rarer — consistent with the sub-cone mechanism. But **`paired_se` overlaps every config's point estimate**, so the four cannot be ranked, and no single configuration reaches `t > 3`
+- **A confound was then found in that design too, and it is the important one.** The blocked arm trains on ~12 donors fully sampled; the leaky arm on ~24 donors half sampled. Sizes matched, donor counts did not. Since dictionary quality depends on how many distinct usage cones the training set spans, the measured gap is "12 donors vs 24 donors" as much as "blocked vs leaky" — not the quantity feature A is about
+- `diagnostics.donor_blocking_gap` was rebuilt as a **three-arm decomposition** in which all arms draw the same number of cells: `blocked` (12 donors, no test donors), `leaky_matched` (12 donors, 6 of them test donors), `leaky_wide` (24 donors, all test donors). `blocked − leaky_matched` isolates **leakage at fixed donor count**; `leaky_matched − leaky_wide` isolates **donor count at fixed leakage**
+- **Status: measurement running, result not yet in.** If `blocked ≈ leaky_matched`, the effect is donor count rather than donor identity, and what feature A must detect needs restating before `delta` is calibrated. That would be a reportable finding, not a reason to adjust the scenario until the number looks better
+
+#### Decisions and deviations recorded
+
+- **D007** — PROTOCOL.md §1.1 corrected to v1.0.1, typed *descriptive correction, no rule changed*
+- No other decision was required. `src/cnmf/**` unchanged; A, B and C remain harness-side switches
+
+#### Status transitions made
+
+- **P0-03: TODO → IN_PROGRESS.** Not DONE: the simulator is written and tested, but its central claim — that donor structure is detectable — is unestablished, and P0-03's purpose is to provide a ground truth the rest of the programme can be scored against
+
+#### Blockers still open
+
+B003, B004 unchanged. New open question, not yet a blocker: whether donor blocking produces a detectable effect at fixed donor count.
+
+#### Next task
+
+Finish the three-arm donor-blocking measurement and record it. Then the **skeleton**: thin splitter + NNLS scorer + runner, producing the first `RESULTS.tsv` rows at `evidence_tier: SMOKE` with `selected_rank` null per §5.3.
 
 ## 10. Resume instruction
 

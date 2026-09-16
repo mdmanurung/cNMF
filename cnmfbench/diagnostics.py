@@ -122,20 +122,37 @@ def donor_blocking_gap(
     predicted the *first* draft of the generative model fails this, which is why
     `identity_eligibility` exists (see `simulate.py`).
 
-    THE COMPARISON HAS TO BE PAIRED ON THE TEST CELLS. A first version of this function
-    compared a donor-blocked split against a random-cell split and scored each on its own
-    held-out cells. That measures how hard the two *test sets* happened to be, not what
-    donor blocking does, and it returned a **negative** gap at the development tier — the
-    blocked arm looked easier merely because its test set contained fewer donors. The
-    corrected design holds the test cells fixed and varies only the training set:
+    TWO CORRECTIONS ARE BAKED INTO THIS DESIGN, both from measurements that came out
+    wrong before they came out right.
 
-    - `blocked`: train on every cell from the **other** donors
-    - `leaky`:   train on a random sample of the same size drawn from a pool that
-      **includes the test donors' remaining cells**
+    **First: the comparison has to be paired on the test cells.** A version that compared
+    a donor-blocked split against a random-cell split, scoring each on *its own* held-out
+    cells, measured how hard the two test sets happened to be rather than what donor
+    blocking does. It returned a **negative** gap at the development tier, because the
+    blocked arm's test set contained fewer donors and was therefore easier. Every arm here
+    scores the same cells.
 
-    The difference is then exactly the advantage that leakage buys, which is the quantity
-    donor blocking exists to remove. A positive gap means donor structure is real and
-    feature A has something to detect.
+    **Second: three arms, because two confound donor count with leakage.** A two-arm
+    function compared "all cells from 12 donors" against "an equal number of cells drawn
+    from all 24". The sizes matched, but the **donor counts did not** — 12 fully sampled
+    against 24 half sampled — and dictionary quality depends on how many distinct usage
+    cones the training set spans, not only on how many cells it has. The measured +2-4%
+    was therefore "12 donors vs 24 donors", not "blocked vs leaky", and reporting it as
+    the latter would have been wrong in exactly the way a reviewer asks about first.
+
+    All three arms draw the **same number of cells**, and differ only as tabulated:
+
+    | arm             | donors | test donors in training? |
+    |-----------------|--------|--------------------------|
+    | `blocked`       | 12     | no                       |
+    | `leaky_matched` | 12     | yes (6 of them)          |
+    | `leaky_wide`    | 24     | yes (all)                |
+
+    So `blocked - leaky_matched` isolates **leakage at fixed donor count** — the quantity
+    feature A is about — while `leaky_matched - leaky_wide` isolates **donor count at
+    fixed leakage**. If `blocked ≈ leaky_matched`, the effect is donor count rather than
+    donor identity, and what feature A must detect needs restating before `delta` is
+    calibrated.
 
     Each repeat mirrors PROTOCOL §3.3-§3.5: fit on training cells scaled by the
     **training** per-gene std, freeze the dictionary, infer held-out usages by NNLS on the
@@ -149,59 +166,89 @@ def donor_blocking_gap(
     uniq = np.unique(donors)
     k_fit = k_fit or dataset.true_spectra.shape[0]
     n_cells = len(donors)
+    half = len(uniq) // 2
 
     n_inf = int(round(inference_gene_fraction * counts.shape[1]))
     gene_order = rng.permutation(counts.shape[1])
     g_inf, g_val = np.sort(gene_order[:n_inf]), np.sort(gene_order[n_inf:])
 
-    blocked_scores, leaky_scores = [], []
+    arms = {"blocked": [], "leaky_matched": [], "leaky_wide": []}
     for _ in range(n_repeats):
-        held_donors = set(rng.permutation(uniq)[: len(uniq) // 2])
+        order = rng.permutation(uniq)
+        held, open_ = list(order[:half]), list(order[half:])
+        held_donors = set(held)
         from_held = np.array([d in held_donors for d in donors])
 
-        # Only half of each held-out donor's cells are scored, so the other half remains
-        # available to leak into the leaky arm's training set.
+        # Only half of each held-out donor's cells are scored, so the other half stays
+        # available to leak into the training sets that are meant to contain leakage.
         held_idx = np.flatnonzero(from_held)
         test_idx = rng.choice(held_idx, size=len(held_idx) // 2, replace=False)
         is_test = np.zeros(n_cells, dtype=bool)
         is_test[test_idx] = True
 
-        blocked_train = ~from_held
-        pool = np.flatnonzero(~is_test)
-        leaky_train = np.zeros(n_cells, dtype=bool)
-        leaky_train[rng.choice(pool, size=int(blocked_train.sum()), replace=False)] = True
+        # `leaky_matched` spans the same NUMBER of donors as `blocked` (half of them),
+        # but half of those donors are test donors — so it carries leakage at the donor
+        # count `blocked` has. That is the contrast that isolates leakage.
+        mixed_donors = set(open_[: half // 2]) | set(held[: half - half // 2])
 
-        for label, train_mask, store in (
-            ("blocked", blocked_train, blocked_scores),
-            ("leaky", leaky_train, leaky_scores),
-        ):
-            store.append(
-                _score_split(counts, donors, train_mask, is_test, g_inf, g_val, k_fit, rng)
+        # Training size is set by the smallest arm's pool so all three draw the same n.
+        # `leaky_matched` is the binding constraint: its test donors contribute only
+        # their non-test cells.
+        pools = {
+            "blocked": np.flatnonzero(~from_held),
+            "leaky_matched": np.flatnonzero(
+                np.array([d in mixed_donors for d in donors]) & ~is_test
+            ),
+            "leaky_wide": np.flatnonzero(~is_test),
+        }
+        n_train = min(len(p) for p in pools.values())
+
+        # The arms share an NMF initialisation. Currently a no-op — `init="nndsvd"` is a
+        # deterministic SVD-based initialisation and sklearn ignores `random_state` for
+        # it — so the remaining paired variance is genuine sampling noise over which
+        # donors were held out, and only more repeats reduce it. Kept because it stops
+        # being a no-op the moment the init changes.
+        init_seed = int(rng.integers(1 << 31))
+
+        for name, pool in pools.items():
+            mask = np.zeros(n_cells, dtype=bool)
+            mask[rng.choice(pool, size=n_train, replace=False)] = True
+            arms[name].append(
+                _score_split(counts, donors, mask, is_test, g_inf, g_val, k_fit, init_seed)
             )
 
-    blocked = np.array(blocked_scores)
-    leaky = np.array(leaky_scores)
-    paired = blocked - leaky  # paired on the test cells, so most variance cancels
+    scores = {k: np.array(v) for k, v in arms.items()}
+    out = {f"{k}_mean": float(v.mean()) for k, v in scores.items()}
+    out["n_repeats"] = n_repeats
+    for label, a, b in (
+        ("leakage_at_fixed_donors", "blocked", "leaky_matched"),
+        ("donor_count_at_fixed_leakage", "leaky_matched", "leaky_wide"),
+        ("combined", "blocked", "leaky_wide"),
+    ):
+        out.update(_paired_stats(label, scores[a], scores[b]))
+    return out
+
+
+def _paired_stats(label, a, b):
+    """Paired on the test cells, so most of the between-repeat variance cancels."""
+    paired = a - b
+    se = paired.std(ddof=1) / np.sqrt(len(paired)) if len(paired) > 1 else float("nan")
     return {
-        "blocked_mean": float(blocked.mean()),
-        "leaky_mean": float(leaky.mean()),
-        "relative_gap": float(paired.mean() / leaky.mean()),
-        "paired_se": float(paired.std(ddof=1) / np.sqrt(len(paired))) if len(paired) > 1 else float("nan"),
-        "paired_t": float(paired.mean() / (paired.std(ddof=1) / np.sqrt(len(paired))))
-        if len(paired) > 1 and paired.std(ddof=1) > 0
-        else float("nan"),
-        "n_repeats": n_repeats,
+        f"{label}_relative": float(paired.mean() / b.mean()),
+        f"{label}_se": float(se),
+        f"{label}_t": float(paired.mean() / se) if se and se > 0 else float("nan"),
     }
 
 
-def _score_split(counts, donors, train_mask, test_mask, g_inf, g_val, k_fit, rng):
+
+def _score_split(counts, donors, train_mask, test_mask, g_inf, g_val, k_fit, init_seed):
     train, test = counts[train_mask], counts[test_mask]
     s = training_gene_std(train)  # training-fitted, never refitted on held-out cells
 
     x_train = train / s[None, :]
     w, h, _ = non_negative_factorization(
         x_train, n_components=k_fit, init="nndsvd", solver="cd", max_iter=400,
-        random_state=int(rng.integers(1 << 31)),
+        random_state=init_seed,
     )
 
     # Freeze the dictionary; infer held-out usages from the inference genes only.
