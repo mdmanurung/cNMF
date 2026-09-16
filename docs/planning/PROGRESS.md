@@ -276,7 +276,15 @@ the operational quantity.
 |---|---|---|---|
 | `donor_count_at_fixed_leakage` | t = **+3.75** | t = **+4.30** | real, clears t > 3 in both |
 | `leakage_at_fixed_donors` | t = −2.90 | t = −0.37 | **null** |
-| `combined` (blocked vs leaky_wide) | t = 1.18 | t = **2.84**, +6.0% | real at config C, n=48 confirmation pending |
+| `combined` (blocked vs leaky_wide) | t = 1.18 | t = **2.84**, +6.0% | **confirmed at n=48**, see below |
+
+**n=48 confirmation of the composite** — the headline contrast, donor-blocked CV against
+random-cell CV on the same dataset: config C **+2.9%, t = 3.10**; config D **+3.6%,
+t = 4.03**. Both clear the `t > 3` bar the approved plan set.
+
+Worth noting for its own sake: going from n=10 to n=48 moved C from 3.85% to 2.92% and D
+from 2.43% to 3.62%, **reversing their order**. That is direct confirmation that the four
+configs could not be ranked at n=10 and that the ordering read there was noise.
 
 1. **The composite effect is real**: donor-blocked CV gives measurably higher held-out
    error than random-cell CV on the same dataset (+6.0% at config C). This is the

@@ -27,6 +27,16 @@ three_arm	A_current	1.0,1.0,0.5,0.5,0.15	1.0,1.0,0.5,0.542,0.167	0.6842	0.7953	c
 three_arm	C_rarer	1.0,0.5,0.35,0.25,0.15	1.0,0.25,0.333,0.333,0.167	0.6916	0.7778	leakage_at_fixed_donors	-0.00610	12.86147	-0.36664	12
 three_arm	C_rarer	1.0,0.5,0.35,0.25,0.15	1.0,0.25,0.333,0.333,0.167	0.6916	0.7778	donor_count_at_fixed_leakage	0.06647	11.20071	4.30315	12
 three_arm	C_rarer	1.0,0.5,0.35,0.25,0.15	1.0,0.25,0.333,0.333,0.167	0.6916	0.7778	combined_blocked_vs_leaky_wide	0.05996	15.32471	2.83743	12
+two_arm	C_rarer	1.0,0.5,0.35,0.25,0.15	1.0,0.25,0.333,0.333,0.167	0.6916	0.7778	blocked_vs_leaky_wide	0.02922	6.80559	3.10492	48
+two_arm	D_rarest	1.0,0.5,0.3,0.15,0.1	1.0,0.25,0.292,0.292,0.167	0.6885	0.7800	blocked_vs_leaky_wide	0.03624	6.46088	4.03353	48
+##
+## HEADLINE, n = 48. The composite contrast — donor-blocked CV vs random-cell CV on the
+## same dataset — is ESTABLISHED: C_rarer +2.9%, t = 3.10; D_rarest +3.6%, t = 4.03. Both
+## clear the t > 3 bar the plan set.
+##
+## Note the n = 10 -> n = 48 movement: C went 3.85% -> 2.92% and D went 2.43% -> 3.62%,
+## REVERSING their order. This confirms directly that the four configs could not be ranked
+## at n = 10 and that the A < B < C ordering read there was noise, not a dose-response.
 ##
 ## RESULT, 2026-09-16. The decomposition separates the composite cleanly:
 ##   donor_count_at_fixed_leakage : t = +3.75 (A), +4.30 (C). REAL, clears t > 3 in both.
