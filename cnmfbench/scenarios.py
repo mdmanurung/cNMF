@@ -71,6 +71,10 @@ _TIER_SHAPE = {
 # The sealed tier keeps the original values. It is sealed precisely so that it is not
 # tuned, and re-tuning it here on development evidence would destroy what makes it
 # confirmation rather than another development set.
+#
+# SMOKE's values are NOT measured and do not need to be: the tier exists to check that the
+# code runs and can never promote a feature (`smoke_can_promote_feature: false`). Do not
+# cite them as calibrated.
 _TIER_ELIGIBILITY = {
     "SMOKE": (1.0, 0.5),
     "DEVELOPMENT": (1.0, 0.5, 0.35, 0.25, 0.15),

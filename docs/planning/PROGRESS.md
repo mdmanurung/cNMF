@@ -337,6 +337,17 @@ because both errors produced confident numbers rather than obvious failures.
 - **A confound was then found in that design too, and it is the important one.** The blocked arm trains on ~12 donors fully sampled; the leaky arm on ~24 donors half sampled. Sizes matched, donor counts did not — so the measured gap is "12 donors vs 24 donors" as much as "blocked vs leaky", and only the second is the quantity feature A is about
 - `diagnostics.donor_blocking_gap` was rebuilt as a **three-arm decomposition** in which all arms draw the same number of cells: `blocked` (12 donors, no test donors), `leaky_matched` (12 donors, 6 of them test donors), `leaky_wide` (24 donors, all test donors). `blocked − leaky_matched` isolates **leakage at fixed donor count**; `leaky_matched − leaky_wide` isolates **donor count at fixed leakage**. That decomposition produced the table above
 
+##### A process finding worth more than it looks
+
+The a priori development default was only tested because its 48-repeat job finished
+**after** the other two, and after the conclusion had already been written and committed.
+Had the session stopped when configs C and D confirmed, it would have shipped a
+development tier incapable of resolving the effect feature A exists to produce, under a
+commit message stating the bar was cleared. The ordering of a background job, not the
+design of the experiment, is what caught it. Worth guarding against directly: a
+configuration that is *the default* should be measured first, not alongside the
+alternatives.
+
 #### Decisions and deviations recorded
 
 - **D007** — PROTOCOL.md §1.1 corrected to v1.0.1, typed *descriptive correction, no rule changed*
@@ -356,6 +367,13 @@ B003, B004 unchanged. No new blocker. Two things to carry forward instead:
 #### Next task
 
 The **skeleton**: thin splitter + NNLS scorer + runner, producing the first `RESULTS.tsv` rows at `evidence_tier: SMOKE` with `selected_rank` null per §5.3.
+
+**Read `diagnostics._score_split` first — and do not let it become the real thing.** It
+already contains a working splitter and NNLS scorer in throwaway form (training-fitted
+per-gene std, frozen dictionary, inference/validation gene panels, `equal_donor_mean`), so
+it is the obvious reference. It is also exactly the hazard D006 named: thin components that
+become load-bearing and are never hardened. It has no fold bookkeeping, no provenance, no
+contract checks, and no `RESULTS.tsv` schema, and it must not acquire them in place.
 
 ## 10. Resume instruction
 
