@@ -279,12 +279,33 @@ the operational quantity.
 | `combined` (blocked vs leaky_wide) | t = 1.18 | t = **2.84**, +6.0% | **confirmed at n=48**, see below |
 
 **n=48 confirmation of the composite** — the headline contrast, donor-blocked CV against
-random-cell CV on the same dataset: config C **+2.9%, t = 3.10**; config D **+3.6%,
-t = 4.03**. Both clear the `t > 3` bar the approved plan set.
+random-cell CV on the same dataset:
 
-Worth noting for its own sake: going from n=10 to n=48 moved C from 3.85% to 2.92% and D
-from 2.43% to 3.62%, **reversing their order**. That is direct confirmation that the four
-configs could not be ranked at n=10 and that the ordering read there was noise.
+| config | gap | t (n=48) | |
+|---|---|---|---|
+| `A_current` — the a priori development default | +1.07% | 1.97 | **does not clear** |
+| `C_rarer` | +2.92% | 3.11 | clears |
+| `D_rarest` | +3.62% | 4.03 | clears |
+
+**The a priori development default failed.** The development tier was therefore
+recalibrated to `C_rarer`'s eligibility — which PROTOCOL §6.4 permits for this tier and
+only this tier — under **DECISIONS D008**. The sealed tier keeps the a priori values and
+is deliberately **not** retuned: a sealed set carrying a development-calibrated constant
+would be a second development set wearing a confirmation label. The cost is accepted —
+sealed confirmation runs on the lower-signal parameterisation, so a confirmation there is
+conservative rather than flattering.
+
+**No coverage effect is claimed.** Between configs, `D vs A` is t = 2.41, `C vs A` t =
+1.69, `D vs C` t = 0.53. Each config is a single dataset realisation, so a between-config
+difference confounds coverage with the dataset draw; that would need several
+`simulation_replicate` values per config and was not done. The claim is narrower and
+sufficient: C clears `t > 3` on its own paired within-config contrast and A does not.
+
+**Correction to a reading made earlier in this session.** Going from n=10 to n=48 reversed
+C and D (3.85% → 2.92%, 2.43% → 3.62%), and C and D are indeed indistinguishable (t =
+0.53). I recorded this at the time as showing the whole ordering was noise. That is too
+strong — A separates from D at t = 2.41. The fine-grained 4-way ranking was noise; whether
+coverage matters at all is simply unresolved.
 
 1. **The composite effect is real**: donor-blocked CV gives measurably higher held-out
    error than random-cell CV on the same dataset (+6.0% at config C). This is the

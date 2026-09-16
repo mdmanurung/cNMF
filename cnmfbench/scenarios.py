@@ -60,9 +60,20 @@ _TIER_SHAPE = {
 # Coverage spans universal / common / rare simultaneously (SOURCE_AUDIT §2.5), so that
 # every comparator's coverage threshold is exercised on both sides and its filtering
 # behaviour is measured rather than assumed.
+#
+# The DEVELOPMENT values were CALIBRATED ON MEASUREMENT, not chosen a priori, which
+# PROTOCOL §6.4 permits for this tier and only this tier. The original (1.0, 1.0, 0.5,
+# 0.5, 0.15) produced a blocked-vs-random CV gap of +1.07% at t = 1.97 over 48 repeats —
+# short of the t > 3 the approved plan requires, i.e. a dataset on which feature A could
+# not be shown to do anything. These values gave +2.92% at t = 3.11. Evidence:
+# registry/p0-03_donor_eligibility_sweep.tsv; rationale: DECISIONS.md D008.
+#
+# The sealed tier keeps the original values. It is sealed precisely so that it is not
+# tuned, and re-tuning it here on development evidence would destroy what makes it
+# confirmation rather than another development set.
 _TIER_ELIGIBILITY = {
     "SMOKE": (1.0, 0.5),
-    "DEVELOPMENT": (1.0, 1.0, 0.5, 0.5, 0.15),
+    "DEVELOPMENT": (1.0, 0.5, 0.35, 0.25, 0.15),
     "SEALED_CONFIRMATION": (1.0, 1.0, 0.5, 0.5, 0.15),
 }
 

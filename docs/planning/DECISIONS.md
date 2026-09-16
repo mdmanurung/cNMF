@@ -121,6 +121,22 @@ Consequences for the baseline and active feature set: none. No `src/cnmf/**` cha
 Protocol/data versions superseded: v1 → v1.0.1. Nothing was produced under v1, so nothing is superseded in substance.
 Independent confirmation needed: none.
 
+## D008 — DEVELOPMENT-tier donor eligibility calibrated on measurement; sealed tier left alone
+
+Date/time: 2026-09-16, P0-03 session
+Type: implementation
+Related task, feature, gate: P0-03, feature A, gate P0
+Context: the simulator's `identity_eligibility` (`q_k`) controls how many donors carry each identity program. P0-03's acceptance condition is that donor-blocked validation measurably differs from random-cell validation on the generated data — otherwise feature A has nothing to detect and every later A-row is uninformative. The first-drafted development value `(1.0, 1.0, 0.5, 0.5, 0.15)` was chosen a priori. Measured over 48 repeats it gives a blocked-vs-random gap of **+1.07%, t = 1.97** — short of the `t > 3` the approved plan requires.
+Options considered: (a) keep the a priori value and accept a development tier on which feature A cannot be shown to do anything; (b) calibrate `q_k` on the development tier, which §6.4 explicitly permits; (c) calibrate on the sealed tier, which would destroy it.
+Decision: (b). DEVELOPMENT `identity_eligibility` is now `(1.0, 0.5, 0.35, 0.25, 0.15)`, measured at **+2.92%, t = 3.11** over 48 repeats. `SEALED_CONFIRMATION` keeps the original a priori values.
+Reason: PROTOCOL §6.4 names DEVELOPMENT as "the only tier that may" inform design, and this is exactly that use — setting a generative constant so the benchmark is capable of resolving the effect it exists to measure. Doing it now, before any comparator row exists and before `delta` is set, is the only point at which it can be done honestly.
+**Why the sealed tier is not re-tuned:** it is sealed so that it is not tuned. Carrying a development-calibrated constant into it would make it a second development set wearing a confirmation label, and the difference would be invisible in the result. The consequence is accepted deliberately: sealed confirmation runs on the harder, lower-signal parameterisation, so a confirmation there is conservative rather than flattering.
+Evidence paths and experiment IDs: `docs/benchmarks/registry/p0-03_donor_eligibility_sweep.tsv` (4 configs × 10 repeats, then 3 configs × 48 repeats, plus the three-arm decomposition).
+Trade-offs and negative evidence: **the between-config comparison is confounded.** Each config was generated from a single dataset realisation, so a difference between configs mixes the coverage setting with the dataset draw. `D vs A` reaches only t = 2.41 and `C vs D` only t = 0.53, so no coverage *effect* is claimed — what is claimed is narrower and sufficient: configuration C reaches `t > 3` on its own paired within-config contrast and the original did not. Establishing a coverage effect would need several `simulation_replicate` values per config and has not been done.
+Consequences for the baseline and active feature set: none algorithmic; no `src/cnmf/**` change. Changes which synthetic data the development tier generates, and therefore invalidates nothing, because no result has been produced on the old values beyond the sweep recorded above.
+Protocol/data versions superseded: none. `q_k` is a simulator parameter, not a PROTOCOL rule; PROTOCOL v1.0.1 is unaffected. Datasets generated before this change have different `dataset_manifest_hash` values by construction (§6.6 hashes all generative parameters), so old and new data cannot be confused.
+Independent confirmation needed: yes, in the ordinary course — the sealed tier is untouched and still gates any adoption claim.
+
 ## Entry template
 
 ### D<id> — <title>
