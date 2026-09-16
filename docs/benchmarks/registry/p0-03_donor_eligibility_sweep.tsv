@@ -21,3 +21,33 @@ two_arm	A_current	1.0,1.0,0.5,0.5,0.15	1.0,1.0,0.5,0.542,0.167	0.6842	0.7953	blo
 two_arm	B_spread	1.0,0.7,0.5,0.3,0.15	1.0,0.583,0.5,0.375,0.167	0.6922	0.7923	blocked_vs_leaky_wide	0.02741	13.00704	1.53207	10
 two_arm	C_rarer	1.0,0.5,0.35,0.25,0.15	1.0,0.25,0.333,0.333,0.167	0.6916	0.7778	blocked_vs_leaky_wide	0.03850	15.49109	1.81005	10
 two_arm	D_rarest	1.0,0.5,0.3,0.15,0.1	1.0,0.25,0.292,0.292,0.167	0.6885	0.7800	blocked_vs_leaky_wide	0.02433	12.82139	1.38629	10
+three_arm	A_current	1.0,1.0,0.5,0.5,0.15	1.0,1.0,0.5,0.542,0.167	0.6842	0.7953	leakage_at_fixed_donors	-0.02008	5.23707	-2.89578	12
+three_arm	A_current	1.0,1.0,0.5,0.5,0.15	1.0,1.0,0.5,0.542,0.167	0.6842	0.7953	donor_count_at_fixed_leakage	0.03371	6.57665	3.74553	12
+three_arm	A_current	1.0,1.0,0.5,0.5,0.15	1.0,1.0,0.5,0.542,0.167	0.6842	0.7953	combined_blocked_vs_leaky_wide	0.01296	8.02095	1.18036	12
+three_arm	C_rarer	1.0,0.5,0.35,0.25,0.15	1.0,0.25,0.333,0.333,0.167	0.6916	0.7778	leakage_at_fixed_donors	-0.00610	12.86147	-0.36664	12
+three_arm	C_rarer	1.0,0.5,0.35,0.25,0.15	1.0,0.25,0.333,0.333,0.167	0.6916	0.7778	donor_count_at_fixed_leakage	0.06647	11.20071	4.30315	12
+three_arm	C_rarer	1.0,0.5,0.35,0.25,0.15	1.0,0.25,0.333,0.333,0.167	0.6916	0.7778	combined_blocked_vs_leaky_wide	0.05996	15.32471	2.83743	12
+##
+## RESULT, 2026-09-16. The decomposition separates the composite cleanly:
+##   donor_count_at_fixed_leakage : t = +3.75 (A), +4.30 (C). REAL, clears t > 3 in both.
+##   leakage_at_fixed_donors      : t = -0.37 (C, null), -2.90 (A, wrong sign). NOT SUPPORTED.
+##
+## So the whole composite effect is donor COUNT / usage-cone diversity, not per-donor
+## identity leakage. This is a consequence of the frozen PROTOCOL §6.3 contract: with a
+## single global K_true x n_genes truth matrix, donor structure is purely compositional,
+## and a held-out cell's NNLS projection against a frozen dictionary cannot depend on
+## which donor it came from. There is no per-donor idiosyncrasy available to leak.
+##
+## Caveat on the negative A value: leaky_matched draws 6 donors at ~200 cells and 6 at
+## ~100 (its test donors contribute only non-test cells), while blocked draws 12 donors
+## evenly. That cell-per-donor imbalance plausibly explains the wrong-signed -2.0%. It
+## makes the null conservative rather than overturning it: even favoured by the
+## imbalance, leakage buys nothing.
+##
+## This does NOT invalidate feature A; it restates its premise. Donor-blocked CV and
+## random-cell CV genuinely differ on the same dataset in how many donors reach the
+## training set (12 vs 24 here), so `combined_blocked_vs_leaky_wide` is the operationally
+## correct contrast for comparing the two CV schemes. The decomposition explains the
+## mechanism behind it. Feature A's claim should be "donor-blocked CV measures
+## generalisation to unseen donors, which random-cell CV overestimates because it trains
+## on more donors' worth of usage-cone diversity" — NOT "it prevents per-donor leakage".
