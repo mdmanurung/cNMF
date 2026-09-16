@@ -217,6 +217,24 @@ Track statistical problems separately from access, dependency, hardware, and imp
 - Exact next command, once verified: none — P0-03 starts with writing a new module. Re-enter the environment first: `module load tools/miniconda/python3.10/23.3.1 && source activate cnmf_bench` (from repo root; export `OMP_NUM_THREADS=OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=1` before any measurement)
 - Immutable artifacts not to overwrite: **`docs/planning/PROTOCOL.md` is frozen** — editing it invalidates the sha256 in `ablation_plan.yaml` and creates a new protocol version under §9, which requires a DECISIONS.md entry in the same commit. Also everything under `docs/benchmarks/registry/` and `tests/test_data/**`, as before
 
+### Session 2026-09-16 — code review of the only implemented script (Claude Code)
+
+- Starting task and code revision: review, at `f3cf941`. No task status changed. `src/cnmf/**` unmodified
+- Scope: the harness contains exactly **one** executable file — `docs/benchmarks/registry/nondeterminism_probe.py` (159 lines). Everything else committed so far is documentation, configs or evidence. That file is load-bearing: its null result is what "Risk 2 refuted" in SOURCE_AUDIT §1.5.1 rests on
+- Files changed: added `docs/benchmarks/registry/nondeterminism_positive_control.py` + `.log` (**new evidence**); annotated `nondeterminism_probe.py` (docstring only — **behaviour deliberately unchanged**, because the recorded TSV was produced by it); corrected SOURCE_AUDIT §1.5.1
+- Commands actually executed and exit codes: coverage check of the recorded TSV (0 — 90 rows = 2 conditions × 9 comparisons × 5 artifacts, so no artifact was silently skipped in the recorded run); positive control v1 (**exit 1 — defective control, see below**); positive control v2 (0)
+- Tests passed / failed / not run: positive control **PASSED** — see the log in the registry
+- Scientific findings, including negative results:
+  1. **The probe's null result is validated.** It previously rested on an instrument never shown to be sensitive. The positive control nudges a single element of each saved artifact by a relative `1e-9` and confirms `compare()` detects it in **all five** artifacts (4.9e-11 to 3.3e-10 relative). The original conclusion stands
+  2. **Scope correction, and it narrows the claim.** Perturbing the refit non-uniformly moves the four refit-derived artifacts but leaves `consensus_spectra` at exactly 0.0 — it is computed *upstream* of the refit (`cnmf.py:913-916`). So Risk 2 is refuted on **four** artifacts, not five; `consensus_spectra`'s stability is evidence about the seeded KMeans instead. SOURCE_AUDIT §1.5.1 corrected
+  3. **A defective control was caught before it became a finding.** The first attempt perturbed the refit by a *uniform scalar*, which cancels exactly under the row normalisation those artifacts undergo, and appeared to show four artifacts "blind". That was a bad control, not a bad probe. Recorded in SOURCE_AUDIT so the mistake is not repeated — a negative result from a control has to be diagnosed before it is believed, exactly like any other
+  4. **The frozen protocol survives unchanged.** PROTOCOL.md §3.3 cites the *convexity* of the fixed-dictionary NNLS, not the five-artifact count, so no amendment under §9 is triggered. Checked rather than assumed
+- Defects recorded but deliberately **not** fixed in place (annotated in the probe's docstring, to be fixed in any successor): silent skipping of missing artifacts combined with an always-zero exit code, so a partially failed run looks clean; no built-in positive control; `bitwise_identical` is exact float64 equality, not file-byte identity; single-process scope. An independent reviewer agent reached the same first three findings
+- Decisions or deviations recorded: none — no decision was required. The probe was annotated rather than edited because it is cited evidence; changing its behaviour while leaving the old TSV attributed to it would break the evidence chain
+- Status transitions made: none
+- Blockers still open: B003, B004 (both unchanged)
+- Next task: **P0-03**, unchanged
+
 ## 10. Resume instruction
 
 Read `AGENTS.md`, `IMPLEMENTATION_PROMPT.md`, and this tracker; inspect the existing worktree; start the next dependency-ready task without implementing deferred features. Update this file and the experiment/decision ledgers with actual evidence before ending the session. If a command cannot run, record why and keep its status NOT_RUN or BLOCKED.

@@ -19,6 +19,36 @@ harness-side remedy. Runs 0 vs 1 of 'free' being identical would instead indicat
 variation is not RNG-driven at all.
 
 Writes a tidy TSV. Does not modify the cNMF package.
+
+REVIEW FINDINGS (2026-09-16) — read before trusting or reusing this script
+-------------------------------------------------------------------------
+This file is kept byte-stable in BEHAVIOUR because `nondeterminism_probe.tsv` was
+produced by it and is cited as evidence; the notes below are annotations, not fixes.
+Any successor (P0-04 will need a similar harness) must fix 1 and 2 rather than copy them.
+
+1. SILENT SKIP (snapshot(), ~line 95; comparison loop, ~line 147). If consensus() fails
+   to write an artifact, snapshot() omits it with no warning and the comparison loop
+   `continue`s past it. A partially failed run is indistinguishable from a clean one, and
+   main() returns None so the exit code is 0 regardless. For the recorded run this did not
+   bite: the TSV has 90 rows = 2 conditions x 9 comparisons x 5 artifacts, so every
+   artifact was present every time. Verified, not assumed.
+
+2. NO POSITIVE CONTROL. As written this script can only report a null, and a null from an
+   instrument never shown to be sensitive is not evidence. Remedied separately rather than
+   by editing this file: see `nondeterminism_positive_control.py` and its `.log`, which
+   reuse this module's own compare() and snapshot() and establish that the chain detects a
+   single-element relative perturbation of 1e-9 in all five artifacts.
+
+3. "bitwise_identical" IS A LOOSE NAME (compare(), ~line 100). It is exact numeric equality
+   of float64 arrays after load_df_from_npz + astype(float), not identity of the file bytes.
+   For float64 npz round-trips with no NaN the two coincide, but text elsewhere should say
+   "exactly equal" rather than "bitwise identical" where precision matters.
+
+4. SCOPE. The reps run in ONE process, so this exercises global-RNG variation between calls
+   (the actual Risk-2 mechanism) but not cross-process effects. Also, per the positive
+   control's TEST 2, `consensus_spectra` is computed UPSTREAM of the refit and cannot move
+   when the refit moves — its stability is evidence about KMeans(random_state=1), not about
+   the unseeded refit. Only the four refit-derived artifacts bear on Risk 2.
 """
 import argparse
 import os

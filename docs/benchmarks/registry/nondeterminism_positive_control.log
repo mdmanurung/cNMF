@@ -1,0 +1,17 @@
+TEST 1 - measuring chain: nudge one element by rel 1e-9, does compare() see it?
+  artifact               rel_frobenius    bitwise    verdict
+  consensus_spectra      8.477e-11        False      SENSITIVE
+  consensus_usages       4.910e-11        False      SENSITIVE
+  gene_spectra_tpm       3.343e-10        False      SENSITIVE
+  gene_spectra_score     9.436e-11        False      SENSITIVE
+  starcat_spectra        1.097e-10        False      SENSITIVE
+TEST 2 - causal reach: perturb refit component 0 by rel 1e-6, what moves?
+  artifact               kind           rel_frobenius    depends on refit?
+  consensus_spectra      pre_refit      0.000e+00        NO
+  consensus_usages       refit_derived  2.514e-07        YES
+  gene_spectra_tpm       refit_derived  4.032e-07        YES
+  gene_spectra_score     refit_derived  3.462e-07        YES
+  starcat_spectra        refit_derived  1.970e-07        YES
+VERDICT: measuring chain is sensitive for all five artifacts (TEST 1 all SENSITIVE).
+The probe's original null result therefore reflects the system, not a blind instrument.
+TEST 2 shows which artifacts the probe could ever have spoken about.
