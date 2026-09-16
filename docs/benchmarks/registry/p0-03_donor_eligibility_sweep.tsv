@@ -38,16 +38,24 @@ three_arm	C_rarer	1.0,0.5,0.35,0.25,0.15	1.0,0.25,0.333,0.333,0.167	0.6916	0.777
 ## and a held-out cell's NNLS projection against a frozen dictionary cannot depend on
 ## which donor it came from. There is no per-donor idiosyncrasy available to leak.
 ##
-## Caveat on the negative A value: leaky_matched draws 6 donors at ~200 cells and 6 at
-## ~100 (its test donors contribute only non-test cells), while blocked draws 12 donors
-## evenly. That cell-per-donor imbalance plausibly explains the wrong-signed -2.0%. It
-## makes the null conservative rather than overturning it: even favoured by the
-## imbalance, leakage buys nothing.
+## LIMITATION OF THIS TIER — the donor-count arm is itself two things at once. All arms
+## draw 1800 cells, so `leaky_wide` spreads them over 24 donors (~75 each) while
+## `leaky_matched` concentrates them in 12 (~150 each). The contrast is therefore "more
+## donors, thinner each" vs "fewer donors, thicker each", and which half drives t = 4.3
+## is not identified. Separating them needs a fourth arm with 24 donors, ~75 cells each
+## and NO test donors — which requires more than 24 donors in total, i.e. more than this
+## tier has. **Donor count and per-donor depth are not separable at the 24-donor
+## DEVELOPMENT tier.** Recorded as a limitation, not resolved.
+##
+## On the leakage arm: read it as null. A's t = -2.90 against C's t = -0.37 is consistent
+## with a null plus heteroskedastic noise — the two SEs differ by 2.5x (5.2 vs 12.9) at
+## n = 12, so A's tighter SE makes a small mean look significant. Not explained further;
+## one wrong-signed excursion at n = 12 does not need a mechanism.
 ##
 ## This does NOT invalidate feature A; it restates its premise. Donor-blocked CV and
 ## random-cell CV genuinely differ on the same dataset in how many donors reach the
 ## training set (12 vs 24 here), so `combined_blocked_vs_leaky_wide` is the operationally
-## correct contrast for comparing the two CV schemes. The decomposition explains the
-## mechanism behind it. Feature A's claim should be "donor-blocked CV measures
-## generalisation to unseen donors, which random-cell CV overestimates because it trains
-## on more donors' worth of usage-cone diversity" — NOT "it prevents per-donor leakage".
+## correct contrast for comparing the two schemes. Feature A's claim should be
+## "donor-blocked CV measures generalisation to unseen donors, which random-cell CV
+## overestimates" — NOT "it prevents per-donor leakage", and NOT a claim about which
+## channel (donor count or per-donor depth) produces the difference.

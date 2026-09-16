@@ -62,7 +62,7 @@ Update status and evidence after each meaningful code/test batch. A task is DONE
 | S0-03 | Setup | Freeze scope and initialize benchmark/decision contracts | S0-02 | DONE | `docs/planning/PROTOCOL.md` written and **frozen** (523 lines; frozen at v1, corrected to v1.0.1 in the P0-03 session, sha256 `71563989…6f4f9ca5`), hash recorded in `ablation_plan.yaml` with `state: frozen`; all seven previously-undefined config names now defined (§1, §3, §4, §5); data contract §6 frozen ahead of the simulator (D006); hash convention §7; `cnmf_full_commit_sha` pinned in `smoke.yaml`. Margins remain null by design (§8) and `confirmation_unlocked: false` |
 | P0-01 | P0 | Reproduce pinned upstream installation, tests and example | S0-03 (inverted — see D003) | DONE | Env `cnmf_bench` built + locked (`registry/env_cnmf_bench.{conda,pip}.txt`, SOURCE_AUDIT §1.4); test data downloaded + hashed (`registry/pytest_data_manifest.tsv`, 148 files); `pytest -vs tests` run, **1 failed / 37 passed**, full log at `registry/p0-01_pytest_run1.log`; failure diagnosed to upstream's scale-blind tolerance (D004, D005) with env proven correct by bitwise-identical `norm_counts`/`consensus_spectra` and exact seed/gene-list/YAML matches; determinism measured (`registry/nondeterminism_probe.tsv`, SOURCE_AUDIT §1.5.1); reproducibility tolerance declared (D004) |
 | P0-02 | P0 | Implement data/artifact schemas, orientation and provenance checks | P0-01 | TODO | Schema tests; manifest examples; explicit expression units — **not yet available** |
-| P0-03 | P0 | Implement simulator, scenario registry and data tiers | P0-02 (**inverted — see D006**; implements PROTOCOL.md §6 instead) | IN_PROGRESS | `cnmfbench/` written: `simulate.py`, `scenarios.py`, `contract.py`, `hashing.py`, `io.py`, `diagnostics.py`; **80 tests pass** (`python -m pytest cnmfbench`), including live integration against the pinned cNMF. Saved truth, independent realizations and the sealed-manifest policy are all implemented and tested. **Open:** the donor-blocking gap is positive but not yet established — see session log 2026-09-16b |
+| P0-03 | P0 | Implement simulator, scenario registry and data tiers | P0-02 (**inverted — see D006**; implements PROTOCOL.md §6 instead) | IN_PROGRESS | `cnmfbench/` written: `simulate.py`, `scenarios.py`, `contract.py`, `hashing.py`, `io.py`, `diagnostics.py`; **80 tests pass** (`python -m pytest cnmfbench`), including live integration against the pinned cNMF. Saved truth, independent realizations and the sealed-manifest policy are all implemented and tested. Donor structure measured: the blocked-vs-random CV gap is real (+6.0%, t=2.84, n=12) but the mechanism is **donor count, not per-donor leakage** (`registry/p0-03_donor_eligibility_sweep.tsv`) — feature A's premise restated accordingly. See session log 2026-09-16b |
 | P0-04 | P0 | Implement four headline metrics and corruption/invariance tests | P0-03 | TODO | Matching/usage/prediction/cost tests and corruption outcomes — **not yet available** |
 | P0-05 | P0 | Implement donor splits, frozen-panel projection and leakage tests | P0-02, P0-04 | TODO | Nested split proof; masked projection tests; normalization leakage tests — **not yet available** |
 | P0-06 | P0 | Preregister training-only baseline rank selection and evaluation protocol | P0-04, P0-05 | IN_PROGRESS | **Specification half done at S0-03.** The selector equation, its sensitivity heuristic, and all four required edge cases (ties, degenerate/flat curve, search boundary, failed/NaN K) are written and frozen in PROTOCOL.md §1 and §1.4. **Remaining:** (a) `delta` is null and the selector must refuse to run while it is — calibration procedure frozen in §2, value set on development controls at the start of P1, creating protocol v1.1; (b) no implementation in code yet. Do not mark DONE until both are closed |
@@ -263,15 +263,50 @@ Also corrected: PROGRESS.md gave PROTOCOL.md as both 518 and 490 lines in the sa
 4. **`donor_id` survives `.h5ad` through a real `prepare()`** into `norm_counts.h5ad`, and does **not** reach the consensus artifacts, which carry only `obs.index`. Both halves now pinned by tests, so a downstream join on the cell index is a lookup rather than a guess
 5. **AnnData coerces an integer index to strings**, closing one route to the §6.1 identifier clause. The real hazard is unaffected and is not about dtype: cNMF's `.npz`/tab-delimited readers discard `obs` columns entirely, which the donor-column clause catches
 
-#### The donor-blocking measurement — the load-bearing open question
+#### The donor-blocking measurement — settled, and it restates feature A's premise
 
-This is what decides whether feature A is testable at all, and it is **not yet settled**.
+This is what decides whether feature A is testable at all. It took **three** designs to
+measure, and the answer is a negative finding on the mechanism with a positive finding on
+the operational quantity.
+
+**Result** (DEVELOPMENT tier, `base_identifiable`, n=12 repeats, evidence at
+`registry/p0-03_donor_eligibility_sweep.tsv`):
+
+| contrast | config A | config C | reading |
+|---|---|---|---|
+| `donor_count_at_fixed_leakage` | t = **+3.75** | t = **+4.30** | real, clears t > 3 in both |
+| `leakage_at_fixed_donors` | t = −2.90 | t = −0.37 | **null** |
+| `combined` (blocked vs leaky_wide) | t = 1.18 | t = **2.84**, +6.0% | real at config C, n=48 confirmation pending |
+
+1. **The composite effect is real**: donor-blocked CV gives measurably higher held-out
+   error than random-cell CV on the same dataset (+6.0% at config C). This is the
+   operationally correct contrast, because the two CV schemes genuinely differ in how many
+   donors reach the training set (12 vs 24 here)
+2. **Per-donor identity leakage is not the mechanism.** Leakage at fixed donor count is
+   null. This follows from the frozen PROTOCOL §6.3 contract rather than from a bad
+   parameter choice: with a single global `K_true × n_genes` truth matrix, donor structure
+   is purely compositional, and a held-out cell's NNLS projection against a frozen
+   dictionary cannot depend on which donor produced it — there is no per-donor
+   idiosyncrasy available to leak. **Sweeping `q_k` could never have fixed this**, which is
+   why the sweep plateaued at t ≈ 1.4–1.8 instead of rising
+3. **The channel is donor count and/or per-donor depth, and the two are not separable at
+   this tier.** All arms draw the same number of cells, so more donors necessarily means
+   fewer cells each (~75 vs ~150). Distinguishing them needs a fourth arm with 24 donors
+   at ~75 cells and no test donors, which requires more than 24 donors in total — more
+   than the DEVELOPMENT tier has. Recorded as a limitation, not resolved
+4. **Feature A's premise is restated, not invalidated:** *donor-blocked CV measures
+   generalisation to unseen donors, which random-cell CV overestimates.* Not "it prevents
+   per-donor leakage", and not a claim about which channel produces the difference
+
+##### How the measurement was wrong twice before it was right
+
+Recorded because a diagnostic that has been wrong twice should carry its own history, and
+because both errors produced confident numbers rather than obvious failures.
 
 - A first two-arm design compared a donor-blocked split against a random-cell split, each scored on **its own** held-out cells. That measures test-set difficulty, not donor blocking, and returned a **negative** gap. Corrected by holding the test cells fixed across arms
-- The corrected two-arm design gives a positive gap across four eligibility settings (+1.7% to +3.9%), rising as programs get rarer — consistent with the sub-cone mechanism. But **`paired_se` overlaps every config's point estimate**, so the four cannot be ranked, and no single configuration reaches `t > 3`
-- **A confound was then found in that design too, and it is the important one.** The blocked arm trains on ~12 donors fully sampled; the leaky arm on ~24 donors half sampled. Sizes matched, donor counts did not. Since dictionary quality depends on how many distinct usage cones the training set spans, the measured gap is "12 donors vs 24 donors" as much as "blocked vs leaky" — not the quantity feature A is about
-- `diagnostics.donor_blocking_gap` was rebuilt as a **three-arm decomposition** in which all arms draw the same number of cells: `blocked` (12 donors, no test donors), `leaky_matched` (12 donors, 6 of them test donors), `leaky_wide` (24 donors, all test donors). `blocked − leaky_matched` isolates **leakage at fixed donor count**; `leaky_matched − leaky_wide` isolates **donor count at fixed leakage**
-- **Status: measurement running, result not yet in.** If `blocked ≈ leaky_matched`, the effect is donor count rather than donor identity, and what feature A must detect needs restating before `delta` is calibrated. That would be a reportable finding, not a reason to adjust the scenario until the number looks better
+- The corrected two-arm design gives a positive gap across four eligibility settings (+1.7% to +3.9%), ordered A < B < C with D out of order. That ordering looked like a dose-response in `q_k` and was briefly read as one. It is not: **`paired_se` overlaps every config's point estimate**, so the four cannot be ranked, and no configuration reaches `t > 3`. The plateau is now explained — the sub-cone mechanism the sweep was probing is not the channel that moves, so no `q_k` value could have made it significant
+- **A confound was then found in that design too, and it is the important one.** The blocked arm trains on ~12 donors fully sampled; the leaky arm on ~24 donors half sampled. Sizes matched, donor counts did not — so the measured gap is "12 donors vs 24 donors" as much as "blocked vs leaky", and only the second is the quantity feature A is about
+- `diagnostics.donor_blocking_gap` was rebuilt as a **three-arm decomposition** in which all arms draw the same number of cells: `blocked` (12 donors, no test donors), `leaky_matched` (12 donors, 6 of them test donors), `leaky_wide` (24 donors, all test donors). `blocked − leaky_matched` isolates **leakage at fixed donor count**; `leaky_matched − leaky_wide` isolates **donor count at fixed leakage**. That decomposition produced the table above
 
 #### Decisions and deviations recorded
 
@@ -284,11 +319,14 @@ This is what decides whether feature A is testable at all, and it is **not yet s
 
 #### Blockers still open
 
-B003, B004 unchanged. New open question, not yet a blocker: whether donor blocking produces a detectable effect at fixed donor count.
+B003, B004 unchanged. No new blocker. Two things to carry forward instead:
+
+- **Donor count and per-donor depth are not separable at the 24-donor DEVELOPMENT tier.** If that separation matters for interpreting feature A's result, the tier needs more donors — a P1 decision with a compute cost, not something to resolve by reanalysis
+- **Feature A's hypothesis text must be restated before P1** to say "measures generalisation to unseen donors, which random-cell CV overestimates" rather than anything about per-donor leakage. Writing it the old way would be claiming a mechanism this session measured and did not find
 
 #### Next task
 
-Finish the three-arm donor-blocking measurement and record it. Then the **skeleton**: thin splitter + NNLS scorer + runner, producing the first `RESULTS.tsv` rows at `evidence_tier: SMOKE` with `selected_rank` null per §5.3.
+The **skeleton**: thin splitter + NNLS scorer + runner, producing the first `RESULTS.tsv` rows at `evidence_tier: SMOKE` with `selected_rank` null per §5.3.
 
 ## 10. Resume instruction
 
