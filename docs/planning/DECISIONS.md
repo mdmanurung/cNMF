@@ -105,6 +105,22 @@ Consequences for the baseline and active feature set: none algorithmic. No `src/
 Protocol/data versions superseded: none. PROTOCOL.md v1 is the first version.
 Independent confirmation needed: none. This is an execution-order decision, not a scientific one.
 
+## D007 — PROTOCOL.md §1.1 corrected to v1.0.1: descriptive correction, no rule changed
+
+Date/time: 2026-09-16, P0-03 session
+Type: protocol (descriptive correction)
+Related task, feature, gate: P0-06, S0-03, gate P0
+Context: PROTOCOL.md §1.1 listed the `k_selection_stats` columns as `k`, `silhouette`, `prediction_error`. The file `cnmf.py` writes **four** columns (`cnmf.py:932-934`); `local_density_threshold` was omitted. The three columns that were named are described correctly, and the baseline selector (§1.3) reads only `k` and `silhouette`. The defect is that the list was presented as exhaustive and was not.
+Options considered: (a) leave it, since no rule depends on the missing column; (b) correct it silently as a typo; (c) correct it, bump the version, and record explicitly that no rule moved.
+Decision: (c). §1.1 now names all four columns and states that `local_density_threshold` records the argument *as passed*, not what happened — `consensus` overrides `density_threshold_str = '2'` in this branch (`cnmf.py:876-877`) and applies no density filtering. Version `1.0.1`, sha256 `715639895663bc74e7b864bc1cfae60c2fcd05b013e25f23016d45e86f4f9ca5`, recorded in `ablation_plan.yaml`.
+Reason: (a) leaves a known falsehood in a document whose authority rests on being checkable. (b) would break the hash recorded in `ablation_plan.yaml` with no trace of why.
+**§9's confirmation-invalidation clause is not triggered.** That clause applies to changes to a frozen *rule*. No rule changed: the selector's inputs, equation, edge cases and refuse-to-run behaviour are untouched, and no confirmation exists to invalidate (`confirmation_unlocked: false`, latest evidence tier NONE). The patch-level version signals exactly this — a `1.x` bump would claim a rule changed.
+Evidence paths and experiment IDs: `docs/planning/PROTOCOL.md` §1.1; `docs/benchmarks/configs/ablation_plan.yaml`; `src/cnmf/cnmf.py:932-934, 876-877`.
+Trade-offs and negative evidence: the correction was specified in the approved P0-03 plan §0 and then not carried out for a full session; nothing cross-checked plan items against tracker state and nothing caught it. The same lapse dropped the `inference_gene_fraction` change in `smoke.yaml` (0.7 → 0.5, also now done). Both are recorded here rather than fixed quietly, because the process gap is the more durable finding.
+Consequences for the baseline and active feature set: none. No `src/cnmf/**` change. The selector is unchanged and still refuses to run while `delta` is null.
+Protocol/data versions superseded: v1 → v1.0.1. Nothing was produced under v1, so nothing is superseded in substance.
+Independent confirmation needed: none.
+
 ## Entry template
 
 ### D<id> — <title>

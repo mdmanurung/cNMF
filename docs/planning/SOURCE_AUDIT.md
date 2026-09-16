@@ -190,6 +190,61 @@ The simulator must therefore **span the coverage axis rather than sit at one end
 
 Repository SHA, license verification in situ, installation, and any code inspection remain P0-09 work. Nothing here has been executed and no comparator row may be written until those are done and `genenmf_full_commit_sha` is pinned in the configs (currently `null`, with a recorded reason).
 
+## 1.6 cNMF API behaviour, measured by running it (P0-03, 2026-09-16)
+
+The traps below were previously recorded from source reading. They have now been
+**executed** against the pinned revision, and running them corrected two of the recorded
+claims and added one that source reading had missed. Regression tests:
+`cnmfbench/tests/test_io_and_cnmf_interop.py`. None of these raises a clear error on its
+own; each produces a run that completes and reports something other than what it appears
+to.
+
+### 1.6.1 `n_iter <= 3` breaks density filtering — **new, not found by reading**
+
+`consensus` computes
+`n_neighbors = int(local_neighborhood_size * merged_spectra.shape[0] / k)`
+(`cnmf.py:879`). Since `merged_spectra` has `n_iter * k` rows, this reduces to
+`int(0.30 * n_iter)` and is **independent of k**. At `n_iter <= 3` it is zero,
+`local_density` is a sum divided by zero, every comparison against the threshold is
+False, and consensus raises:
+
+> `RuntimeError: Zero components remain after density filtering. Consider increasing density threshold`
+
+The message points at the threshold, which is not the cause — no threshold value fixes a
+division by zero. Verified for `n_iter` in {2, 3, 4, 5, 10, 20} at `k` in {3, 7, 12}.
+
+**This invalidated `smoke.yaml`**, which had `optimizer_starts: 3`. Every consensus call
+in the smoke tier would have failed. Changed to 5.
+
+### 1.6.2 The reused-run-name trap is the opposite of what was recorded
+
+Recorded previously as "a reused name silently skips factorization". Measured, the
+`completed=True` marking and its `UserWarning` occur inside `get_nmf_iter_params`, which
+`prepare()` calls — so the warning fires at **prepare** time. And `factorize` defaults to
+`skip_completed_runs=False` (`cnmf.py:692`), so with default arguments it **re-runs**
+every replicate.
+
+So silent skipping requires `skip_completed_runs=True`. The live hazard with default
+arguments is that a reused directory silently **overwrites** the previous run's factors
+while the warning scrolls past. A fresh `name`/`output_dir` per run is still required; the
+reason is overwriting, not skipping.
+
+### 1.6.3 The `.h5ad` requirement is confirmed end-to-end
+
+`obs['donor_id']` survives `prepare()` into `norm_counts.h5ad` — asserted against the real
+pinned package, not a mock. It does **not** reach the consensus artifacts, which carry
+only `obs.index` (`cnmf.py:920, 975`), so donor labels must be re-joined on the cell index
+downstream. Both halves are now pinned by tests.
+
+### 1.6.4 AnnData closes one route to the §6.1 identifier clause
+
+AnnData coerces an integer index to strings on construction
+(`ImplicitModificationWarning: Transforming to str index`), so a dataset built through
+AnnData cannot violate the positional-identifier clause. The underlying hazard is real but
+is not about dtype: cNMF's `.npz` and tab-delimited readers rebuild `obs`/`var` as bare
+indices (`cnmf.py:396-402`) and **discard `donor_id` entirely**, which the donor-column
+clause catches.
+
 ## 3. Other reference repositories (R NMF, SigMoS, SUITOR, mosaicMPI, Snakemake)
 
 Not inspected this session — none gate S0/P0 acceptance evidence per the brief's table (design precedents, consulted when the relevant task is active: P0.4/P0.5 for SUITOR/SigMoS design precedent, workflow tasks for Snakemake). Will be filled in incrementally as those tasks become active, not pre-scaffolded now, per AGENTS.md's instruction against creating unused abstractions.

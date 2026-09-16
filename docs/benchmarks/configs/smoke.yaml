@@ -17,12 +17,24 @@ factorization:
   backend: pinned_upstream_cnmf
   loss: frobenius
   candidate_ranks: [2, 3, 4]
-  optimizer_starts: 3
+  # Must be >= 4, measured, not preference. cNMF computes
+  # n_neighbors = int(local_neighborhood_size * merged_spectra.shape[0] / k), and
+  # merged_spectra has n_iter*k rows, so it reduces to int(0.30 * n_iter) regardless of
+  # k. At n_iter <= 3 it is zero, local_density becomes a division by zero, and
+  # consensus() dies with "Zero components remain after density filtering. Consider
+  # increasing density threshold" — a message that misdescribes the cause, since raising
+  # the threshold cannot fix it. Was 3; every consensus call would have failed.
+  # Regression test: cnmfbench/tests/test_io_and_cnmf_interop.py
+  optimizer_starts: 5
   max_optimizer_iterations: 300
 validation:
   outer_donor_folds: 2
   inner_donor_folds: 2
-  inference_gene_fraction: 0.7
+  # 0.5, not 0.7: the held-out overfit penalty scales as d_eff/|G_inf|, so a larger
+  # inference panel flattens the K-curve and weakens the very signal feature A must
+  # detect. Changed before any comparison was run. This is a config value, not a
+  # frozen PROTOCOL rule.
+  inference_gene_fraction: 0.5
   panel_repetitions: 1
   projection: nonnegative_least_squares_frozen_dictionary
   transform: training_fitted_and_leakage_audited

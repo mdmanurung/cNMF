@@ -115,3 +115,9 @@ results/scratch/
 
 # Registry holds gate evidence and must survive the blanket *.log rule above.
 !docs/benchmarks/registry/*.log
+
+# Generated benchmark datasets and cNMF run directories. Manifests are small and stay
+# in version control; counts and factor banks do not (AGENTS.md: keep large datasets and
+# generated artifacts out of the repository).
+cnmfbench/**/__pycache__/
+data/simulated/

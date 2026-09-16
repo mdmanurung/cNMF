@@ -1,6 +1,6 @@
 # PROTOCOL — frozen benchmark and selection rules
 
-`protocol_version: 1`
+`protocol_version: 1.0.1`
 `hash_convention_version: 1`
 `metric_definition_version: 1`
 State: **FROZEN** (see §9 for what "frozen" permits and forbids)
@@ -48,9 +48,14 @@ rank by…" is false and must not appear in a report produced by this programme.
 
 Both inputs already exist on disk after a rank sweep; the selector computes nothing new.
 `k_selection_plot` (`cnmf.py:1119-1158`) calls `consensus(skip_density_and_return_after_stats=True)`
-per K and saves a DataFrame to the `k_selection_stats` path with columns:
+per K and saves a DataFrame to the `k_selection_stats` path with **four** columns
+(`cnmf.py:932-934`):
 
 - `k` — candidate rank
+- `local_density_threshold` — the argument **as passed**, not a description of what happened.
+  In this branch `consensus` overrides `density_threshold_str = '2'` (`cnmf.py:876-877`) and
+  applies no density filtering. The selector does **not** read this column; it is named here
+  only so a future session does not mistake it for a record of the filtering actually applied
 - `silhouette` — stability, **higher is better**
 - `prediction_error` — in-sample reconstruction error, **lower is better**
 
