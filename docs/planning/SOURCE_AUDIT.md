@@ -127,9 +127,68 @@ Exact-equality artifacts — which are BLAS- and version-independent and therefo
 
 Consequences: the two most expensive and most seed-sensitive steps (`factorize`, `combine`) have **zero** upstream coverage, and the stability/error curve underlying any K-selection surrogate (`k_selection_plot`) is untested. Our harness must supply its own coverage there; passing upstream's suite certifies far less than it appears to. There is also no `conftest.py`, no `skipif` and no data-availability fixture — absent test data produces an error inside the test body, not a skip.
 
-## 2. GeneNMF — deferred
+## 2. The meta-program lineage: Gavish et al. and GeneNMF (documentation audit, 2026-09-16)
 
-Not inspected this session. S0-02's acceptance evidence for the P0.4 transform question is satisfied by the cNMF dataflow trace above; GeneNMF inspection does not gate P0-01 through P0-05 (per the brief, its comparator adapter is P0-09). Deferred to the P0-09 window. `SOURCE_AUDIT.md` §2 will be filled in at that time with repository, resolved SHA, license, and traced functions (`runNMF`, `multiNMF`, `getMetaPrograms`, `getNMFgenes`).
+Read at the user's direction. **Documentation only — no code inspected, nothing installed, no SHA resolved.** The comparator adapter remains deferred to P0-09; what follows is prior art that bears on decisions being taken *now*, recorded so those decisions are made with it in view rather than retrofitted to it later.
+
+Sources: the GeneNMF CRAN reference manual (v0.9.2, dated 2025-09-11, GPL-3, `carmonalab/GeneNMF`), read in full; the BCC methods excerpt supplied by the user; and the pan-cancer meta-program methods of Gavish et al., *Nature* 2023 (`s41586-023-06130-4`), supplied by the user. GeneNMF packages the Gavish approach, so they are one lineage, not two independent precedents.
+
+### 2.1 What the lineage actually does
+
+Both factorize **each sample separately** over a **range of K** and then cluster the resulting programs across samples into *meta-programs* (MPs). Neither selects a rank.
+
+| | Gavish et al. 2023 | GeneNMF (`getMetaPrograms`) |
+|---|---|---|
+| Per-sample NMF over K | K = 4…9 → 39 programs/tumour | `multiNMF(k=5:6, ...)`, any vector |
+| Input scale | centred expression, negatives set to 0 | `slot="data"` (log-normalised), `center=FALSE`, `scale=FALSE` |
+| Program representation | **top 50 genes** by NMF coefficient | top genes by `weight.explained=0.5`, capped at `max.genes=200` |
+| Similarity | **Jaccard** on gene sets | `metric = "cosine"` or `"jaccard"` |
+| Clustering | custom greedy founder/accretion algorithm | `hclust`, `hclust.method="ward.D2"`, cut to `nMP` |
+| MP definition | genes common to member programs, completed to 50 by NMF score | genes seen in ≥ `min.confidence` of member programs |
+| Number of MPs | emergent (67 initial → 41 retained) | `nMP` is a **user-set hyperparameter** (default 10) |
+
+Gavish's three robustness criteria are worth stating exactly, because two of them map onto features in this programme:
+
+1. **robust within the tumour** — a program recurring across K values in the same tumour (≥70% gene overlap, 35/50 genes)
+2. **robust across tumours** — ≥20% similarity with any program in any other tumour
+3. **non-redundant within the tumour** — programs ranked by similarity to other tumours' programs and selected greedily; once selected, any other program *from the same tumour* overlapping ≥20% is **removed**
+
+### 2.2 Feature C has published precedent
+
+**Criterion 3 is feature C.** The brief's C is "for each baseline cluster and each run, keep at most the factor closest to that cluster's frozen baseline representative"; Gavish's is "once a program is selected, drop any other program from the same tumour that overlaps it". Same intent — stop one source contributing several near-duplicate factors to one consensus — differing in the unit (their *tumour*, our *run*) and the rule (their greedy overlap threshold, our nearest-to-representative).
+
+GeneNMF **exposes the diagnostic but does not deduplicate**: `metaprograms.metrics` reports "number of gene programs in MP" and `metaprogram.composition` reports "the number of individual [programs] for each sample that contributed to the consensus MPs". So the pathology is measured and left to the user.
+
+Consequences, to be carried into `contracts/C.md` when P3 opens: C is not a novel invention and must not be presented as one; the greedy-overlap formulation is a legitimate alternative worth reporting as a sensitivity; and `metaprogram.composition` is the natural diagnostic to report for our own consensus, whether or not C is adopted.
+
+### 2.3 Both operate on gene sets, not spectra vectors — a metric gap
+
+cNMF clusters **full L2-normalised nonnegative spectra** by Euclidean distance (`cnmf.py:882, 908`). This lineage reduces each program to a **top-gene set** and compares by Jaccard. That is a different object, not a different parameterisation of the same one.
+
+`PROTOCOL.md` §5.2 defines `program_recovery_cosine_v1` over "full loading vectors in common gene units". **For a comparator that emits only gene sets, that metric is unavailable** — which is exactly the case `IMPLEMENTATION_PROMPT.md:204` anticipates ("When only native gene sets are available, score gene-set outcomes; any additional NNLS projection must be labeled an adapter-derived score, not a native GeneNMF usage").
+
+**Open item, flagged now rather than discovered at P0-09:** the frozen §5.2 vocabulary contains no gene-set recovery metric. Adding one (a Jaccard/overlap sibling to the cosine metric) is a **protocol amendment under §9**. It is not needed for P0 or P1 — which are cNMF-vs-cNMF and have full spectra on both sides — but it must be added *before* any comparator row is written, and the cleanest moment is the v1.1 amendment that sets `delta`. Recorded so it is not back-filled under deadline.
+
+### 2.4 The comparator is structurally uninformative for feature A
+
+Feature A selects a rank. **This lineage never selects a rank** — it sweeps K and pools every program across all K values, moving the hyperparameter to `nMP` (GeneNMF) or letting cluster count emerge (Gavish). There is therefore no sense in which GeneNMF "chooses K better or worse" than our baseline.
+
+So: the GeneNMF comparator is informative for **B** (per-sample factorization is the limiting case of donor-balanced discovery) and for **C** (§2.2), and **not** for A. Recording this prevents a later attempt to construct an A-comparison that has no meaning. Note also `IMPLEMENTATION_PROMPT.md:204` already forbids tuning `nMP` on the test set or simulated truth — with `nMP` user-set and unjustified even in the source papers (the BCC paper "asked for 10 target MPs" with no stated rationale), that is a live risk.
+
+### 2.5 Sample coverage — the finding that changes P0-03 now
+
+Both papers filter programs by how many samples support them, at very different thresholds:
+
+- Gavish criterion 2: a program must resemble a program in **at least one other** tumour (≥20% similarity) — an effective floor of 2 samples; MPs drawn from only a single study were additionally dropped.
+- BCC/GeneNMF: MPs with **sample coverage below 40%** were dropped, alongside filters on <5 genes and negative average silhouette. `metaprograms.metrics` field (a) is "freq. of samples where the MP is present"; the paper defines coverage as "the proportion of samples in which the MP was detected".
+
+**Direct consequence for the simulator (P0-03, in progress).** The plan's donor-eligibility fix sets `q_k ≈ 0.10–0.20`, i.e. programs present in 10–20% of donors. A GeneNMF comparator configured as the BCC paper configured it would **discard every such program by construction**, and would then appear to fail at rare-program recovery for a reason that is a documented user setting rather than a property of the method. That would be an unfair comparison, and the unfairness would be invisible in the result.
+
+The simulator must therefore **span the coverage axis rather than sit at one end of it** — programs at roughly universal (1.0), common (~0.5), and rare (~0.15) donor coverage within the same dataset, so that any method's coverage threshold is exercised on both sides and its filtering behaviour is measured rather than assumed. This also serves `B_context` directly, and gives `rare_context_recovery_maximum_harm` something real to bind on.
+
+### 2.6 Still deferred
+
+Repository SHA, license verification in situ, installation, and any code inspection remain P0-09 work. Nothing here has been executed and no comparator row may be written until those are done and `genenmf_full_commit_sha` is pinned in the configs (currently `null`, with a recorded reason).
 
 ## 3. Other reference repositories (R NMF, SigMoS, SUITOR, mosaicMPI, Snakemake)
 
