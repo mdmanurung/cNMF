@@ -362,7 +362,7 @@ alternatives.
 B003, B004 unchanged. No new blocker. Two things to carry forward instead:
 
 - **Donor count and per-donor depth are not separable at the 24-donor DEVELOPMENT tier.** If that separation matters for interpreting feature A's result, the tier needs more donors — a P1 decision with a compute cost, not something to resolve by reanalysis
-- ~~**Feature A's hypothesis text must be restated before P1**~~ → **DONE**, `docs/planning/FEATURE_CONTRACT_A.md`. States "measures generalisation to unseen donors, which random-cell CV overestimates" and records the three-arm measurement (leakage at fixed donor count t = −0.37; donor count t = +4.30) so the discarded framing cannot return. Adds the concrete mechanism found in the DEVELOPMENT run: one identity program with a **single** training carrier donor in `outer_0`, which no random-cell split can ever place out of sample. Endpoints exist; every margin remains NOT_SET
+- ~~**Feature A's hypothesis text must be restated before P1**~~ → **DONE**, `docs/planning/contracts/A.md`. States "measures generalisation to unseen donors, which random-cell CV overestimates" and records the three-arm measurement (leakage at fixed donor count t = −0.37; donor count t = +4.30) so the discarded framing cannot return. Adds the concrete mechanism found in the DEVELOPMENT run: one identity program with a **single** training carrier donor in `outer_0`, which no random-cell split can ever place out of sample. Endpoints exist; every margin remains NOT_SET
 
 #### Next task
 
@@ -459,7 +459,7 @@ Then P0-02 / P0-05 hardening, the P0 gate, then P1/A. The user's target is the f
 
 ### Standing notes
 
-- `docs/planning/contracts/` and `docs/planning/gates/` still do not exist — only the two templates. `contracts/A.md` is due before any P1 evaluation; `gates/P0.md` before the P0 gate closes.
+- `docs/planning/contracts/A.md` now **exists** — hypothesis restated against measurement, endpoints named, every margin still `NOT_SET`, so it cannot issue an adoption decision. `docs/planning/gates/` is created but empty; `gates/P0.md` is still due before the P0 gate closes.
 - Background reading order for any scoring work: `SOURCE_AUDIT.md` §1.2 (three distinct spectra normalizations, two std pipelines), then §1.5 (measured determinism, declared tolerance), then D004 (**provisional** — the 1e-5 tolerance must be confirmed or revised at P0-04, where the absolute floor for near-zero artifacts must also be chosen) and D005.
 - The transform question once flagged in §1.2 is **settled** and written into PROTOCOL.md §3.1: scoring uses the HVG-panel / `median_spectra` route, never all-gene / `spectra_tpm`, because TPM-normalising a held-out cell divides by its total across *all* genes including its validation panel.
 - `src/cnmf/**` has not been modified and should not be. A, B and C arrive as harness-side switches.
