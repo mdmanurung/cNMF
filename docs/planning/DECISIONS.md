@@ -137,6 +137,56 @@ Consequences for the baseline and active feature set: none algorithmic; no `src/
 Protocol/data versions superseded: none. `q_k` is a simulator parameter, not a PROTOCOL rule; PROTOCOL v1.0.1 is unaffected. Datasets generated before this change have different `dataset_manifest_hash` values by construction (§6.6 hashes all generative parameters), so old and new data cannot be confused.
 Independent confirmation needed: yes, in the ordinary course — the sealed tier is untouched and still gates any adoption claim.
 
+## D009 — Schema vocabularies invented in the harness, not by editing the frozen protocol
+
+Date/time: 2026-09-17, skeleton session
+Type: implementation
+Related task, feature, gate: P0-02, P0-03, gate P0
+Context: `RESULTS.tsv` and `EXPERIMENTS.tsv` shipped as header-only files. **Six columns that must be filled had no defined vocabulary anywhere in the repository**, and two of them — `stratum` and `evaluation_scope` — have no mention in *any* markdown file in `docs/`: they are not merely undefined, they are undescribed. `status` is the load-bearing case, because PROTOCOL §1.4 and §5.3 both rely on it to separate "this arm did not select a rank" from "the selector failed", and neither section says what it may contain.
+Options considered: (a) write rows with blanks or invented values and move on; (b) amend PROTOCOL.md to define them; (c) define minimum vocabularies in `cnmfbench/records.py`, validated at write time, recorded here, and batched into the eventual v1.1 amendment.
+Decision: (c). `RESULT_STATUS`, `EXPERIMENT_STATUS`, `EVALUATION_SCOPE` and `ARM` are enumerated in `records.py`; `result_row`/`experiment_row` raise on anything outside them. Minimum, not exhaustive — they cover what this session writes and nothing more.
+Reason: (b) would create a new protocol version. PROTOCOL.md's bytes are hashed into `ablation_plan.yaml` and §9 makes any edit a versioned amendment, so filling a gap in a *schema* would drag the frozen *rules* along with it. (a) is what D006's mitigation exists to prevent. Batching the vocabularies into v1.1 alongside `delta` and the precision/recall threshold costs one amendment instead of three.
+**Three conventions decided here, each of which could reasonably have gone the other way:**
+1. **`protocol_hash` is the file-bytes artifact hash.** §7's table is internally inconsistent — row 1 lists it as parameter-like, row 4 gives this file the artifact rule. File-bytes is chosen because it is the only version `sha256sum docs/planning/PROTOCOL.md` can verify, which is what the tracker's own resume instruction tells a reader to run. Verified equal to the recorded value by a test.
+2. **`n_eligible_units`/`n_failed_units` count the units aggregated into that row's own value** — cells on a per-donor row, donors on an aggregate row. §4.3 counts cells and §3.5 counts donors in the same column, and this is the only rule satisfying both. **`evaluation_scope` is therefore a required filter on any aggregation**; ignoring it double-counts cells against donors.
+3. **A blank cell means a true null; `NOT_COMPUTED` means a value that could not be produced.** The writer rejects the strings `None`, `nan`, `null`, `NA`. An empty cell is otherwise indistinguishable from a quoting bug, a legitimate null and a forgotten column.
+Evidence paths and experiment IDs: `cnmfbench/records.py`; `cnmfbench/tests/test_records_and_fence.py`; the 114 + 6 rows in `docs/benchmarks/{RESULTS,EXPERIMENTS}.tsv`.
+Trade-offs and negative evidence: a vocabulary invented by the first code to write a column is a vocabulary the next reader may misinterpret, and that risk is highest for `stratum` and `evaluation_scope` precisely because no prose anywhere says what they were for. Recorded rather than hidden.
+Consequences for the baseline and active feature set: none algorithmic. No `src/cnmf/**` change.
+Protocol/data versions superseded: none. PROTOCOL.md is untouched and still v1.0.1, hash `715639895663bc74e7b864bc1cfae60c2fcd05b013e25f23016d45e86f4f9ca5`.
+Independent confirmation needed: no.
+
+## D010 — `arm` is `full_training_pool`, not `matched_budget`
+
+Date/time: 2026-09-17, skeleton session
+Type: implementation
+Related task, feature, gate: P0-03, feature B, gate P2
+Context: the skeleton runs `configuration: '000'` — all three feature switches off. The obvious label for its `arm` is `matched_budget`, the A/B/C factorial arm. But the skeleton trains on **every cell of every training donor with no cell budget**, and `ablation_plan.yaml` defines the matched-budget arm's B-inactive sampling as `proportional_without_replacement` at a fixed total. What the skeleton actually does is `upstream_full_data`'s definition applied to a training fold.
+Options considered: (a) label it `matched_budget` since the configuration string is `000`; (b) label it `full_training_pool` and record that these rows are not the matched-budget arm.
+Decision: (b). `ARM` in `records.py` includes `full_training_pool`; every row carries it, and `EXPERIMENTS.notes` says `arm=full_training_pool_no_cell_budget`.
+Reason: **(a) would create a silent, uncorrectable confound in the B comparison two stages from now.** A future `010` run under a cell budget compared against these `000` rows would attribute the budget difference to feature B. The configuration string and the arm are different facts and this session is the only point at which the distinction is free to record.
+Evidence paths and experiment IDs: `docs/benchmarks/RESULTS.tsv`, `docs/benchmarks/EXPERIMENTS.tsv`, all rows this session.
+Trade-offs and negative evidence: **these rows are therefore not comparable to a future `010` without re-running `000` under a cell budget.** That re-run is a cost this decision creates and P2-01 must plan for; the alternative was a comparison that looked valid and was not.
+Consequences for the baseline and active feature set: none algorithmic. Constrains what the skeleton's rows may later be compared against.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
+## D011 — The thin-component fence is code, not prose
+
+Date/time: 2026-09-17, skeleton session
+Type: implementation
+Related task, feature, gate: P0-02, P0-04, P0-05, P0-07, gate P0
+Context: D006 chose to build the splitter and scorer thin and harden them later, and recorded its own standing risk: "the thin split/scorer/runner written in the skeleton session is throwaway-grade by construction, and the standing risk is that it becomes load-bearing and is never hardened." Prose has not prevented that failure before — three items specified in the approved P0-03 plan were approved and then silently dropped, and nothing caught it because nothing cross-checked plan text against state.
+Options considered: (a) rely on D006's prose plus `evidence_tier: SMOKE`; (b) a machine-detectable registry the P0 gate check must read.
+Decision: (b). `cnmfbench/provisional.py` holds a registry of five components with their owning ledger task and what hardening requires. A decorator marks each and records, **at call time**, that it ran. Every row from a run with a non-empty touched-set carries `status = ok_provisional` and names the components in `notes`.
+**Two gate checks, deliberately separate.** `registry_is_empty()` is the code-level check that blocks the P0 gate; it is false while any decorator remains, and closing it means deleting decorators and registry entries together. `cited_rows_are_not_provisional()` is data-level and **scoped to the experiment ids a gate actually cites** — never a whole-file scan, because provisional rows stay in `RESULTS.tsv` permanently and correctly, and a whole-file scan would block the gate forever no matter how much hardening happened afterwards.
+Reason: the difference between (a) and (b) is whether forgetting is possible. A registry a gate reads cannot be forgotten; a paragraph in a decision entry demonstrably can.
+Evidence paths and experiment IDs: `cnmfbench/provisional.py`; `cnmfbench/tests/test_records_and_fence.py`, which asserts the registry and the decorators agree **in both directions** — a stale entry un-fences a component silently, a decorator without an entry cannot be read by the gate — and that no module outside `diagnostics.py` references the throwaway `_score_split`, which is D006's named hazard.
+Trade-offs and negative evidence: the fence costs a decorator on five hot-path functions and one extra status string. It does not make the thin components correct; it only makes their thinness impossible to lose track of.
+Consequences for the baseline and active feature set: the P0 gate cannot close until P0-04, P0-05 and P0-07 empty the registry.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>

@@ -2,16 +2,16 @@
 
 **Specification prepared:** 15 September 2026  
 **Target repository:** `dylkot/cNMF`  
-**Current state:** IN_PROGRESS — S0 closed and the protocol frozen at v1; upstream reproduced within a declared tolerance; P0-03 (simulator) is next  
-**Important:** No target-package code has been modified and no scientific benchmarks have been run. S0 produced an audit and a frozen protocol; nothing yet produces a benchmark number.
+**Current state:** IN_PROGRESS — S0 closed, protocol frozen at v1.0.1, simulator built and measured, and **the benchmark loop now closes end to end**: `RESULTS.tsv` holds 114 rows and `EXPERIMENTS.tsv` 6, at `evidence_tier: SMOKE`  
+**Important:** No target-package code has been modified. The first rows exist but **establish execution, not scientific benefit** — `smoke_can_promote_feature: false` and `allow_scientific_promotion: false` make them unusable for any adoption decision, and every row carries `status: ok_provisional` because throwaway components produced it.
 
 ## 1. Session dashboard
 
 | Field | Current value |
 |---|---|
-| Active prototype | P0 — baseline reproduced, protocol frozen; next is the simulator (P0-03) |
+| Active prototype | P0 — loop closes end to end at SMOKE; next is hardening (P0-02/P0-04/P0-05) |
 | Active task | None |
-| Next task | **P0-03** — implement the simulator to spec, against the data contract frozen in PROTOCOL.md §6 (task order inverted vs the ledger by D006; see §10) |
+| Next task | **P0-04** — the four headline metrics and the corruption/invariance battery. See the handoff in §9 |
 | Implementing agent/session | Claude Code session, 2026-09-15 |
 | Local checkout | `/exports/para-lipg-hpc/mdmanurung/cNMF`, branch `main` |
 | Environment | conda env `cnmf_bench` (Python 3.10.20, cnmf 1.7.1 editable from this checkout, BLAS scipy-openblas 0.3.29). Activate: `module load tools/miniconda/python3.10/23.3.1 && source activate cnmf_bench` |
@@ -22,16 +22,16 @@
 | Protocol version/hash | **FROZEN — v1.0.1**, `docs/planning/PROTOCOL.md`, sha256 `715639895663bc74e7b864bc1cfae60c2fcd05b013e25f23016d45e86f4f9ca5`, recorded in `ablation_plan.yaml` (`protocol.state: frozen`). `confirmation_unlocked: false` — two constants are null by design (`delta` §2, precision/recall threshold §5.2), both set on development controls at the start of P1, which creates v1.1 |
 | Baseline selector specification | **SPECIFIED, NOT RUNNABLE.** Equation and all four edge cases frozen in PROTOCOL.md §1/§1.4: `K* = max{K : silhouette(K) ≥ max silhouette − delta}` (largest-among-stable, *not* argmax — see §1.2 for why argmax would rig P1). `delta` is null, so the selector **refuses to run**. Not yet implemented in code (P0-06) |
 | Recommended configuration | None, and none is possible yet — no configuration has been evaluated. `000` is the *reference*, not a recommendation |
-| Latest evidence tier | NONE |
-| Last update by implementing agent | P0-03 session, 2026-09-16 |
-| Session checkpoint | S0-01, S0-02, S0-03, P0-01 **DONE**. Protocol frozen at v1. P0-06 IN_PROGRESS (spec written, `delta` null, no code). Nothing that produces a benchmark number exists yet: no simulator, no splitter, no scorer; `RESULTS.tsv` and `EXPERIMENTS.tsv` are still header-only. Next: P0-03 simulator |
+| Latest evidence tier | **SMOKE** — 114 `RESULTS.tsv` rows + 6 `EXPERIMENTS.tsv` rows, configuration `000`, all `status: ok_provisional`. Cannot promote any feature |
+| Last update by implementing agent | Skeleton session, 2026-09-17 |
+| Session checkpoint | S0-01, S0-02, S0-03, P0-01, **P0-03 DONE**. Protocol frozen at v1.0.1. P0-06 IN_PROGRESS (spec written, `delta` null, no code). The loop closes: simulator, splitter, scorer, runner and both schemas exist; 122 harness tests pass; 114 + 6 rows written at SMOKE. Five components are fenced as throwaway (`cnmfbench/provisional.py`, D011) and the P0 gate cannot close until they are hardened. Next: P0-04 |
 
 ## 2. Progress counts
 
-**4 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01).  
-TODO: 26 · IN_PROGRESS: 1 (P0-06 — selector specification frozen in PROTOCOL.md §1, but `delta` is null and no code exists) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
+**5 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03).  
+TODO: 25 · IN_PROGRESS: 1 (P0-06 — selector specification frozen in PROTOCOL.md §1, but `delta` is null and no code exists) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
 
-Scientific adoption remains separate and untouched. P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance; S0-03 establishes the rules by which future evidence will be judged. Neither is evidence for any feature, and no benchmark number has been produced yet.
+Scientific adoption remains separate and untouched. P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance; S0-03 establishes the rules by which future evidence will be judged; the skeleton establishes that the loop executes end to end. **None of that is evidence for any feature.** Benchmark numbers now exist, but only at SMOKE tier, from fenced throwaway components, for the reference configuration `000` — there is nothing to compare them against, and `smoke_can_promote_feature: false` forbids using them if there were.
 
 States: TODO → IN_PROGRESS → VERIFY → DONE; also BLOCKED and DROPPED. Keep the denominator fixed for this scope; show dropped and blocked counts separately. Implementation completion is not scientific adoption.
 
@@ -39,7 +39,7 @@ States: TODO → IN_PROGRESS → VERIFY → DONE; also BLOCKED and DROPPED. Keep
 
 | Prototype | Intervention | Software status | Scientific adoption | Evidence tier | Gate artifact |
 |---|---|---|---|---|---|
-| P0 | Unchanged baseline + evaluation | UNTESTED | NOT_APPLICABLE | NONE | Not created |
+| P0 | Unchanged baseline + evaluation | **PASS (smoke only)** | NOT_APPLICABLE | **SMOKE** | Not created — the gate cannot close while `cnmfbench/provisional.py` lists five throwaway components (D011) |
 | P1 | A: predictive rank selection | UNTESTED | NOT_EVALUATED | NONE | Not created |
 | P2 | B: donor-balanced discovery | UNTESTED | NOT_EVALUATED | NONE | Not created |
 | P3 | C: run-aware consensus | UNTESTED | NOT_EVALUATED | NONE | Not created |
@@ -62,7 +62,7 @@ Update status and evidence after each meaningful code/test batch. A task is DONE
 | S0-03 | Setup | Freeze scope and initialize benchmark/decision contracts | S0-02 | DONE | `docs/planning/PROTOCOL.md` written and **frozen** (523 lines; frozen at v1, corrected to v1.0.1 in the P0-03 session, sha256 `71563989…6f4f9ca5`), hash recorded in `ablation_plan.yaml` with `state: frozen`; all seven previously-undefined config names now defined (§1, §3, §4, §5); data contract §6 frozen ahead of the simulator (D006); hash convention §7; `cnmf_full_commit_sha` pinned in `smoke.yaml`. Margins remain null by design (§8) and `confirmation_unlocked: false` |
 | P0-01 | P0 | Reproduce pinned upstream installation, tests and example | S0-03 (inverted — see D003) | DONE | Env `cnmf_bench` built + locked (`registry/env_cnmf_bench.{conda,pip}.txt`, SOURCE_AUDIT §1.4); test data downloaded + hashed (`registry/pytest_data_manifest.tsv`, 148 files); `pytest -vs tests` run, **1 failed / 37 passed**, full log at `registry/p0-01_pytest_run1.log`; failure diagnosed to upstream's scale-blind tolerance (D004, D005) with env proven correct by bitwise-identical `norm_counts`/`consensus_spectra` and exact seed/gene-list/YAML matches; determinism measured (`registry/nondeterminism_probe.tsv`, SOURCE_AUDIT §1.5.1); reproducibility tolerance declared (D004) |
 | P0-02 | P0 | Implement data/artifact schemas, orientation and provenance checks | P0-01 | TODO | Schema tests; manifest examples; explicit expression units — **not yet available** |
-| P0-03 | P0 | Implement simulator, scenario registry and data tiers | P0-02 (**inverted — see D006**; implements PROTOCOL.md §6 instead) | IN_PROGRESS | `cnmfbench/` written: `simulate.py`, `scenarios.py`, `contract.py`, `hashing.py`, `io.py`, `diagnostics.py`; **80 tests pass** (`python -m pytest cnmfbench`), including live integration against the pinned cNMF. Saved truth, independent realizations and the sealed-manifest policy are all implemented and tested. Donor structure measured: the blocked-vs-random CV gap is real (+6.0%, t=2.84, n=12) but the mechanism is **donor count, not per-donor leakage** (`registry/p0-03_donor_eligibility_sweep.tsv`) — feature A's premise restated accordingly. See session log 2026-09-16b |
+| P0-03 | P0 | Implement simulator, scenario registry and data tiers | P0-02 (**inverted — see D006**; implements PROTOCOL.md §6 instead) | **DONE** | `cnmfbench/` — simulator, scenario registry (8 specified, 3 implemented), §6 contract checks, §7 hashing, `.h5ad` io with hash verification, diagnostics. Saved truth, independent realizations and the sealed-manifest policy implemented and tested. Donor structure **measured**: blocked-vs-random CV gap real (+2.9%, t=3.10, n=48) but the mechanism is donor count, not per-donor leakage (`registry/p0-03_donor_eligibility_sweep.tsv`, D008). All three feasibility checks run (`registry/p0-03_feasibility_checks.tsv`). 122 harness tests pass |
 | P0-04 | P0 | Implement four headline metrics and corruption/invariance tests | P0-03 | TODO | Matching/usage/prediction/cost tests and corruption outcomes — **not yet available** |
 | P0-05 | P0 | Implement donor splits, frozen-panel projection and leakage tests | P0-02, P0-04 | TODO | Nested split proof; masked projection tests; normalization leakage tests — **not yet available** |
 | P0-06 | P0 | Preregister training-only baseline rank selection and evaluation protocol | P0-04, P0-05 | IN_PROGRESS | **Specification half done at S0-03.** The selector equation, its sensitivity heuristic, and all four required edge cases (ties, degenerate/flat curve, search boundary, failed/NaN K) are written and frozen in PROTOCOL.md §1 and §1.4. **Remaining:** (a) `delta` is null and the selector must refuse to run while it is — calibration procedure frozen in §2, value set on development controls at the start of P1, creating protocol v1.1; (b) no implementation in code yet. Do not mark DONE until both are closed |
@@ -375,6 +375,55 @@ it is the obvious reference. It is also exactly the hazard D006 named: thin comp
 become load-bearing and are never hardened. It has no fold bookkeeping, no provenance, no
 contract checks, and no `RESULTS.tsv` schema, and it must not acquire them in place.
 
+### Session 2026-09-17 — the walking skeleton: the first benchmark rows (Claude Code)
+
+- Starting task and code revision: the skeleton, at `cdf946a` (harness) / `5dbc5ba` (upstream). `src/cnmf/**` unmodified throughout and re-verified byte-identical after the commit
+- **`RESULTS.tsv` and `EXPERIMENTS.tsv` are no longer header-only.** 114 and 6 rows, configuration `000`, SMOKE tier
+- Files created: `cnmfbench/{provisional,splits,scoring,records,skeleton}.py` and two test modules; `docs/benchmarks/registry/p0-03_feasibility_checks.tsv`
+- Files edited: `smoke.yaml` (three missing keys), `DECISIONS.md` (D009, D010, D011), `PROGRESS.md`
+- Commands actually executed and exit codes: `python -m pytest cnmfbench -q` (0 — **122 passed**, was 80); `python -m cnmfbench.skeleton --run-id p0skel-000-20260917` (0); `python -m cnmfbench.skeleton --merge …` (0, 114 + 6 rows); a second merge (**exit 1, correctly refused** — duplicate `experiment_id`); `git diff 5dbc5ba..HEAD -- src/ tests/ setup.py pyproject.toml` (empty)
+- Experiment IDs and artifact paths: 6 experiments, `000-full_training_pool-base_identifiable_SMOKE_r0-outer_{0,1}-k{2,3,4}-…`; run artifacts under `results/exploratory/p0skel-000-20260917/` (gitignored; `registry/p0-03_feasibility_checks.tsv` is the tracked record)
+
+#### What the loop does
+
+`simulate` → donor split → **training-only `.h5ad`** → real cNMF `prepare/factorize/combine/consensus` → frozen-dictionary NNLS on the inference panel → score the disjoint validation panel → `equal_donor_mean`. Held-out cells never enter cNMF, which is how §3.3's `test_spectra_refit: forbidden` holds by construction rather than by enforcement.
+
+#### Scientific findings, including negative results
+
+1. **The transform matches cNMF exactly — relative Frobenius `0.000e+00` in both folds.** This was the check that decided whether any of these numbers mean anything: had the harness's `s_g` differed from cNMF's, every prediction error would be wrong by a per-gene factor and nothing would have crashed. The assertion lives in the run path, not the tests, because it guards a *branch condition on an input property* (`cnmf.py:537` branches on sparsity) and a future switch to sparse output would silently take the other branch
+2. **Silhouette dynamic range 0.115 / 0.035 — the degenerate branch does NOT fire.** Four orders of magnitude above §1.4's `1e-6`, so the baseline will not collapse to "always the smallest K" and the eventual `000` vs `100` is not measuring nothing. This was the precondition for `delta` meaning anything. Noted for P1: the curve is **monotone decreasing** in K, exactly the shape §1.2 warns about and the reason the baseline is largest-among-stable rather than argmax
+3. **HVG retention 0.77–0.85 per program — passes in both directions.** Not near 0 (a program's signal filtered out before scoring, which would make the benchmark report "no difference" because the signal was gone) and not 1.0 (Fano selection acting as a perfect oracle for the planted markers)
+4. **The Poisson error floor exposes a capability limit.** K=2 sits 18–22% above the arithmetic floor, so under-fitting is clearly detectable — but at `K_true` the observed error is only **~5%** above the floor, and the K=3→K=4 gap is 1.2% and 6.2%, comparable to that headroom. **At SMOKE scale this benchmark distinguishes an under-fitted rank well and has little room to distinguish `K_true` from `K_true + 1`.** Must be re-measured at DEVELOPMENT scale, where the overfit penalty weakens ~11× going from 180 to 2000 genes
+5. **§4.3's exclusion path never fired** (0 cells, both folds; minimum inference-panel total is 137 counts). The graceful-degradation code is therefore not exercised by the smoke run and a bug in it would be invisible — covered by a synthetic test instead
+
+#### Corrections adopted before implementation, from adversarial review
+
+Several were measured against the real data and changed decisions rather than wording:
+
+- **`arm` is `full_training_pool`, not `matched_budget`** (D010). The skeleton uses every training-donor cell with no budget, which is `upstream_full_data`'s definition applied to a training fold. Mislabelling it would have created a silent, uncorrectable confound in the B comparison two stages later — at the cost that these rows now require a budgeted `000` re-run before any `010` comparison
+- **Nothing records which K won.** K=3 is the argmin in 10/10 measured cases, making it the most tempting number here; any column naming it would be the baseline selector running while `delta` is null
+- **The null predictor takes the mean of the *scaled* matrix.** Using raw counts inflates the floor ~4× silently
+- **`scipy.optimize.nnls`, not cNMF's `tol=1e-4` coordinate descent** — §3.3 defines an argmin and states the problem is convex, and exactness makes the leakage test bitwise
+- **Per-donor rows, not aggregates only.** Per-donor error ranges 99–250 within a fold and tracks depth
+- **My earlier carrier-probability estimate was superseded by measurement.** Program 2 has 3 carriers of 8 donors at seed 1701, so the folds train on 1 and 2 — the asymmetry is *already present*, not a 12% risk. The split was **not** rerolled to balance it: that would use ground truth to choose a split, which §6.3 forbids
+
+#### Decisions recorded
+
+**D009** (schema vocabularies invented in the harness, not by editing the frozen protocol — six columns had none, and `stratum`/`evaluation_scope` had no mention in any document), **D010** (`arm`), **D011** (the fence is code: a registry the P0 gate reads, with two deliberately separate checks so historical provisional rows cannot jam it forever).
+
+#### Status transitions made
+
+- **P0-03: IN_PROGRESS → DONE.** Acceptance evidence complete: saved truth, independent realizations, sealed-manifest policy, and all three feasibility checks run
+- P0 gate: software status **PASS (smoke only)**, evidence tier **SMOKE**, scientific adoption **NOT_APPLICABLE**. The gate cannot close while five components are fenced
+
+#### Blockers still open
+
+B003, B004 unchanged. Carried forward: `delta` and the precision/recall threshold stay null; feature A's hypothesis text must be restated before P1 to say "measures generalisation to unseen donors, which random-cell CV overestimates", never anything about per-donor leakage.
+
+#### Next task
+
+**P0-04** — the four headline metrics and the corruption/invariance battery. `program_recovery_cosine_v1` needs the one-to-one matcher that `consensus_spectra`'s usage-ordered renaming makes necessary, and a matched null reported beside it or its ~0.9 floor makes the number uninterpretable.
+
 ## 10. Resume instruction
 
 Read `AGENTS.md`, `IMPLEMENTATION_PROMPT.md`, and this tracker; inspect the existing worktree; start the next dependency-ready task without implementing deferred features. Update this file and the experiment/decision ledgers with actual evidence before ending the session. If a command cannot run, record why and keep its status NOT_RUN or BLOCKED.
@@ -387,17 +436,26 @@ Editing it is not a normal edit. Any change to a frozen rule creates a **new pro
 
 Two constants are **null by design** and stay null until P1: `delta` (the baseline selector's stability tolerance, §2) and the precision/recall threshold (§5.2). Both make their consumer **refuse to run** rather than fall back to a default. Do not "fix" this by supplying a default — that would be choosing a constant after seeing the data. Their calibration procedure is already frozen in §2.
 
-### The next task is P0-03: the simulator
+### The next task is P0-04: the four headline metrics
 
-Task order is inverted against the ledger by **decision D006** — read it first, it carries a guard clause. P0-03 runs before P0-02 because every later metric is scored against the simulator's ground truth, so a thin or wrong simulator would silently invalidate everything built on it, in a way no downstream test could detect.
+The loop closes. `simulate -> split -> real cNMF -> frozen-dictionary NNLS -> equal_donor_mean -> rows` runs end to end and has written 114 `RESULTS.tsv` rows at SMOKE. What is missing is what those rows are *for*: only prediction and cost metrics exist, and three of PROTOCOL §5.2's eleven names carry the scientific question.
 
-P0-03 implements **PROTOCOL.md §6**, written before the simulator exists precisely so the contract is fixed in advance: orientation (cells × genes), dtypes, units at each stage, `obs['donor_id']` as the donor label, ground truth stored alongside the counts (never inside them), the three data tiers, and the `dataset_manifest_hash` input list. **P0-02 may not later redefine §6** — if §6 turns out inadequate, that is a protocol amendment, not a schema-layer choice.
+P0-04 implements **program recovery, usage accuracy, and the corruption battery** (`IMPLEMENTATION_PROMPT.md:145-152`). Two traps are already known:
 
-Deliverables: donor-structured Poisson counts (smoke sizes 8 donors × 30 cells × 180 genes, 3 true programs); saved true spectra and true usages; genuinely independent `simulation_replicate` draws (not reseeded reruns of the same structure); the three tiers with the **sealed manifest policy written now**, while nothing is tempted to peek; and the scenario registry with `base_identifiable` implemented and `A_weak` / `A_null` scaffolded for P1.
+- **`consensus_spectra` reorders programs by descending total usage and renames them 1..K** (`cnmf.py:938-946`), so program identity is not stable across runs — not even across re-runs on identical inputs, since the ordering derives from an unseeded refit and an unstable sort. `program_recovery_cosine_v1` therefore needs an explicit one-to-one maximum-weight matcher and may never key on program index.
+- **`program_recovery_cosine_v1` has a floor near 0.9.** A "dictionary" of K copies of the background scores ~0.95 against every true program. Report a **matched null** beside every recovery row or the number is uninterpretable.
 
-`observation_model: poisson` in `smoke.yaml` is the **simulator's** generative model, not the deferred NB/Poisson factorization backend. The factorization loss stays `frobenius`. See PROTOCOL.md §6.5 — this trap is documented because it will otherwise cost a session.
+**D004 obliges two things at P0-04, not after:** confirm or revise the 1e-5 tolerance against corruption sensitivity, and **set the absolute floor for near-zero artifacts before the first such artifact appears**, since choosing it afterwards would be choosing it against a known case.
 
-After P0-03 comes the walking skeleton (thin split + NNLS scorer + runner → the first `RESULTS.tsv` rows at `evidence_tier: SMOKE`), then P0-02 / P0-04 / P0-05 hardening, then the P0 gate, then P1/A. The user's target is the first `000` vs `100` comparison. Approved plan: `/home/mdmanurung/.claude/plans/plan-the-next-steps-warm-tome.md`.
+Then P0-02 / P0-05 hardening, the P0 gate, then P1/A. The user's target is the first `000` vs `100` comparison. Approved plan: `/home/mdmanurung/.claude/plans/plan-the-next-steps-warm-tome.md`.
+
+### Five components are fenced as throwaway, and the P0 gate reads the fence
+
+`cnmfbench/provisional.py` lists `splits.outer_donor_folds`, `splits.gene_panel`, `scoring.nnls_usages`, `scoring.equal_donor_mean` and `skeleton.run`, each with its owning ledger task and what hardening requires (D011). Every row they produce carries `status: ok_provisional`.
+
+`registry_is_empty()` is the gate check and is **false** today. Emptying it means deleting decorators and registry entries together, in a commit with a decision entry. Do not "tidy" the registry without doing the hardening it names.
+
+**Read `diagnostics._score_split` as reference and do not extend it in place** — it is cited P0-03 evidence, its docstring records why that measurement was wrong twice, and a test asserts no module outside `diagnostics.py` references it.
 
 ### Standing notes
 
