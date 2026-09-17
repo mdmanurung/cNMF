@@ -187,6 +187,23 @@ Consequences for the baseline and active feature set: the P0 gate cannot close u
 Protocol/data versions superseded: none.
 Independent confirmation needed: no.
 
+## D012 — The DEVELOPMENT feasibility verdict is NO-GO, and the criterion that produced it is mis-specified
+
+Date/time: 2026-09-17, feasibility session
+Type: scientific adoption
+Related task, feature, gate: P0-03, P0-04, feature A, gate P0
+Context: the criteria were pre-registered and committed at `f1e86fa` before the run was launched. The run (`p0-03-dev-feasibility`, 610 RESULTS / 16 EXPERIMENTS rows) returned criterion 1 PASS (paired t = 26.8 over 24 donors), criterion 3 PASS (silhouette ranges 0.282, 0.301), criterion 2 FAIL in `outer_1` (1.0101 and 1.0142 against a 1.02 threshold). Under the pre-registered rule "NO-GO if any fails", the verdict is NO-GO.
+The curve nevertheless minimises at `K_true = 7` in **both** folds, descends monotonically from K=4 (ratio 1.137, 1.166) to K=7 and rises monotonically to K=10; the silhouette holds ~0.996 through K=7 and drops sharply at K=8 in both folds. Two independent signals place the elbow at `K_true`.
+Options considered: (a) override the verdict on the strength of that curve; (b) record NO-GO and treat the curve as an observation; (c) amend criterion 2 in place and recompute.
+Decision: **(b).** The verdict recorded in `p0-03_development_feasibility.tsv` is NO-GO and is not revised. Separately, and recorded as an argument rather than as a result: criterion 2 inspects only `K_true` and `K_max`, both of which lie on the *overfit* side of the minimum where the curve is nearly flat by construction. Its stated rationale — "no signal left to select on" — is falsified by this run's own data, since the grid spans 1.137 → 1.016. It passed at SMOKE only because that grid's `K_max = 4` sat on the *underfit* side of a `K_true = 3` curve, so the same rule tested a different quantity at the two tiers.
+Reason: (a) and (c) are the same act with different labels. A criterion rewritten by whoever has just watched it fail carries no evidential weight however sound the argument, and the programme's entire discipline is that constants precede data. The mis-specification is real and is worth recording precisely *because* recording it costs the convenient outcome.
+**The remediation menu was itself under-specified.** The pre-registration offered four permitted responses to NO-GO. Options 1–3 (raise separation, add depth or donors, narrow the grid) all strengthen a benchmark that is already resolving rank correctly, and option 4 ("report that the frozen §6.3 contract cannot support predictive rank selection at achievable scale") would be a **false report** given this curve. None of the four is correct here. The lesson for the v1.1 amendment is that a remediation menu written before the data cannot anticipate a failure of the instrument rather than of the subject, and should carry an explicit "the criterion was wrong" branch requiring fresh pre-registration.
+Evidence paths and experiment IDs: `docs/benchmarks/registry/p0-03_development_feasibility.tsv`; pre-registration at `f1e86fa`, amendment at `3ed5bae`, verdict at `48718d7`; run `results/exploratory/p0-03-dev-feasibility` (gitignored), `dataset_manifest_hash 31b4cf0b…`. Cost agreement verified on this run: 0 disagreements across all 16 experiments.
+Trade-offs and negative evidence: the NO-GO blocks the claim that feature A's premise is established, which is the honest position — see D013, since criterion 1's `t = 26.8` is itself exposed to an under-convergence confound that the diagnostic run tests. Incidental negative evidence recorded in the same file: `n_training_carriers_per_identity_program = [12, 3, 3, 4, 1]` in `outer_0`, i.e. one identity program is carried by a **single** training donor.
+Consequences for the baseline and active feature set: nothing is promoted; `allow_scientific_promotion` is false at this tier and `scientific_adoption` is INCONCLUSIVE. P0-04 is unblocked regardless, because recovery metrics measure whether the right programs were found, which is independent of whether rank can be selected.
+Protocol/data versions superseded: none.
+Independent confirmation needed: yes — any replacement criterion must be pre-registered afresh, with its seed committed in advance, and evaluated on a run at a different seed. A criterion tested on the data that motivated it has no evidential force.
+
 ## Entry template
 
 ### D<id> — <title>
