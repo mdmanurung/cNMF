@@ -97,6 +97,28 @@ preference, each requiring its own decision entry:
 fact (§1.4 forbids it outright), or switching to whichever metric happens to separate the
 ranks.
 
+## Amendment, added while the run was still in flight and the result unknown
+
+`max_optimizer_iterations: 300` (inherited from `smoke.yaml`; upstream's default is 1000)
+produces `ConvergenceWarning: Maximum number of iterations 300 reached` at this scale.
+
+**Under-converged factorizations are a recognised confound for criteria 1 and 2**: if the
+fits have not converged, a higher K cannot express its extra capacity, the curve flattens
+for a numerical reason rather than a scientific one, and the run would report NO-GO when
+the benchmark is in fact capable.
+
+Declared now, before the verdict is known, so that acting on it afterwards is not fishing:
+
+> If criterion 1 or criterion 2 fails, a re-run at `max_optimizer_iterations: 1000`
+> (upstream's default) is a **permitted diagnostic** to rule out under-convergence. It
+> does not change any criterion or threshold. If the verdict flips, the reported finding
+> is that the original setting was too low — not that the benchmark passed on a second
+> attempt. If criterion 3 fails, this does not apply; a degenerate silhouette curve is not
+> a convergence artifact.
+
+Convergence is a property of the fit, not of the benchmark, and ruling it out is part of
+measuring the benchmark honestly.
+
 ## Results
 
 Appended after the run, in `p0-03_development_feasibility.tsv`. This file is not edited

@@ -64,3 +64,84 @@ def pooling_groups(rows, experiments):
     for r in rows:
         groups.setdefault(lookup.get(r["experiment_id"], "UNKNOWN"), []).append(r)
     return groups
+
+
+# ---------------------------------------------------------------- the feasibility gate
+
+PRIMARY_LOSS = "heldout_squared_prediction_error_v1"
+
+
+def feasibility_verdict(rows, diagnostics, k_true, k_max):
+    """Evaluate the three pre-registered criteria. **Does not choose a rank.**
+
+    The criteria and their thresholds are fixed in
+    `registry/p0-03_development_feasibility_PREREGISTRATION.md`, committed before the run
+    that this evaluates. They are reproduced here as constants rather than parameters so
+    that calling this function cannot quietly change them.
+
+    Note what this returns and what it does not: a GO/NO-GO on whether a usable K-curve
+    *exists*. It never reports which K minimises error. `delta` is null, §2 requires the
+    selector to refuse, and `000` is a fixed-rank configuration — a "winning K" recorded
+    on an A-OFF row would be the baseline selector under another name.
+    """
+    import numpy as np
+
+    per_donor = {}
+    for r in rows:
+        if r["metric"] != PRIMARY_LOSS or r["evaluation_scope"] != "per_donor":
+            continue
+        per_donor.setdefault(int(r["candidate_rank"]), {})[r["independent_unit_id"]] = float(
+            r["value"]
+        )
+    missing = {k_true, k_max} - set(per_donor)
+    if missing:
+        raise ValueError(f"no per-donor rows at rank(s) {sorted(missing)}")
+
+    # Criterion 1 — paired per donor. Pairing within a donor cancels the fold's gene
+    # panel and per-gene scale, so donors from different folds are comparable in the
+    # DIFFERENCE even though their levels are not. Donors are the independent unit (§3.5).
+    shared = sorted(set(per_donor[k_true]) & set(per_donor[k_max]))
+    diffs = np.array([per_donor[k_max][d] - per_donor[k_true][d] for d in shared])
+    se = float(diffs.std(ddof=1) / np.sqrt(len(diffs))) if len(diffs) > 1 else float("nan")
+    mean_diff = float(diffs.mean())
+    c1 = bool(mean_diff > 3 * se) if se and se > 0 else False
+
+    # Criteria 2 and 3 are per fold; a single failing fold fails the run.
+    folds = []
+    for d in diagnostics:
+        floor = d["poisson_error_floor_per_cell"]
+        obs = {k: _fold_mean(rows, d["outer_split_id"], k) for k in (k_true, k_max)}
+        ratio_true, ratio_max = obs[k_true] / floor, obs[k_max] / floor
+        sil_range = d["silhouette_dynamic_range"]
+        folds.append({
+            "outer_split_id": d["outer_split_id"],
+            "poisson_floor_per_cell": floor,
+            f"observed_k{k_true}": obs[k_true], f"observed_k{k_max}": obs[k_max],
+            "ratio_k_true": ratio_true, "ratio_k_max": ratio_max,
+            # Fail only if BOTH ends sit on the floor: one end near it is fine, both
+            # means there is no signal left anywhere on the curve.
+            "criterion_2_not_flat": bool(not (ratio_true < 1.02 and ratio_max < 1.02)),
+            "silhouette_dynamic_range": sil_range,
+            "criterion_3_not_degenerate": bool(sil_range > 1e-6),
+        })
+
+    c2 = all(f["criterion_2_not_flat"] for f in folds)
+    c3 = all(f["criterion_3_not_degenerate"] for f in folds)
+    return {
+        "k_true": k_true, "k_max": k_max, "n_paired_donors": len(shared),
+        "mean_paired_difference": mean_diff, "paired_se": se,
+        "paired_t": mean_diff / se if se and se > 0 else float("nan"),
+        "criterion_1_curve_structure": c1,
+        "criterion_2_not_flat_by_arithmetic": c2,
+        "criterion_3_silhouette_not_degenerate": c3,
+        "verdict": "GO" if (c1 and c2 and c3) else "NO-GO",
+        "folds": folds,
+    }
+
+
+def _fold_mean(rows, outer_split_id, k):
+    for r in rows:
+        if (r["metric"] == PRIMARY_LOSS and r["evaluation_scope"] == "equal_donor_mean"
+                and r["outer_split_id"] == outer_split_id and r["candidate_rank"] == str(k)):
+            return float(r["value"])
+    raise ValueError(f"no equal_donor_mean row for {outer_split_id} at k={k}")
