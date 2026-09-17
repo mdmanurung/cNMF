@@ -181,9 +181,16 @@ def test_shared_fit_cost_is_attributed_exactly_once():
     experiments = _tracked("EXPERIMENTS.tsv")
     if not experiments:
         pytest.skip("no rows written yet")
+    # Group by the whole fold identity, not by `outer_split_id` alone. Every run names its
+    # folds `outer_0`, `outer_1`, ..., so once the tracked file holds more than one run the
+    # bare split id collides across them and this test reads two runs' fit rows as two fit
+    # rows for one fold. `dataset_id` carries scenario, tier and replicate; with the
+    # configuration bits and the split id it identifies the fold uniquely.
     by_fold = {}
     for e in experiments:
-        by_fold.setdefault(e["outer_split_id"], []).append(e)
+        key = (e["dataset_id"], e["outer_split_id"], e["arm"],
+               e["feature_A"], e["feature_B"], e["feature_C"])
+        by_fold.setdefault(key, []).append(e)
     for fold, rows in by_fold.items():
         fit = [r for r in rows if r["candidate_rank"] == ""]
         per_rank = [r for r in rows if r["candidate_rank"] != ""]
