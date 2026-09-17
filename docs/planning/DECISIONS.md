@@ -72,7 +72,25 @@ Trade-offs and negative evidence: relative error is undefined/unstable for artif
 Consequences for the baseline and active feature set: none algorithmic. Governs how P0-04 regression/corruption tests and the P0 gate's compatibility check are evaluated.
 Protocol/data versions superseded: none (PROTOCOL.md not yet written; this decision is an input to it).
 Independent confirmation needed: re-measure before relying on it for the `kullback-leibler`/`mu` solver path — all evidence so far is from `frobenius`/`cd`.
-Status: **PROVISIONAL.** The 1e-5 value is calibrated on a single observation (one artifact, one dataset, one solver). It becomes settled only when P0-04's corruption and invariance tests confirm it separates "numerically identical" from "structurally different" — those tests are precisely where a too-loose tolerance shows up, as an injected corruption that fails to trip the check. Two things must therefore be resolved at P0-04, not after: (i) confirm or revise the 1e-5 value against corruption sensitivity, and (ii) set the absolute floor for all-zero/near-zero artifacts noted in the trade-offs above **before** the first such artifact appears, since choosing it afterwards would be choosing it against a known case.
+Status: ~~**PROVISIONAL.**~~ → **CONFIRMED at P0-04, 2026-09-17.** The 1e-5 value is calibrated on a single observation (one artifact, one dataset, one solver). It becomes settled only when P0-04's corruption and invariance tests confirm it separates "numerically identical" from "structurally different" — those tests are precisely where a too-loose tolerance shows up, as an injected corruption that fails to trip the check. Two things must therefore be resolved at P0-04, not after: (i) confirm or revise the 1e-5 value against corruption sensitivity, and (ii) set the absolute floor for all-zero/near-zero artifacts noted in the trade-offs above **before** the first such artifact appears, since choosing it afterwards would be choosing it against a known case.
+
+**Both obligations are now discharged; `cnmfbench/compare.py` and `cnmfbench/tests/test_compare.py`.**
+
+(i) **CONFIRMED, not revised.** Measured separation on a 7 × 1200 spectra artifact:
+
+| probe | relative Frobenius | vs 1e-5 |
+|---|---|---|
+| float32 round-trip (harsher than same-environment BLAS variation) | 2.49e-08 | 400× below |
+| uniform relative shift of 1e-06 | 1.00e-06 | **missed**, by design |
+| uniform relative shift of 1e-05 | 1.00e-05 | caught, exactly at the edge |
+| one gene +50% in one program | 3.60e-03 | 360× above |
+| swapping two programs | 5.74e-01 | 57,000× above |
+
+The tolerance sits ~400× above numerical noise and ~360× below the mildest *structural* corruption tried, so the band it has to discriminate is about five orders of magnitude wide and 1e-5 sits near its middle. The value is confirmed on evidence rather than carried forward on assumption — and confirming is as much a result as revising would have been.
+
+(ii) **Absolute floor set: `1e-12` on the Frobenius norm**, chosen while **no** near-zero artifact has yet appeared, which is the only condition under which choosing it is honest. Below the floor the comparison switches from relative to absolute Frobenius error against the same floor, because a relative error is undefined there and "undefined" must not read as "passed" — the failure mode being prevented is a division by zero making the near-zero case the *easiest* to pass. The value sits ~1e4 above float64 epsilon (2.2e-16), far enough to absorb accumulation, and far below any quantity this pipeline produces (spectra rows sum to 1, usages are O(1), counts are O(1e3)).
+
+Unchanged: this remains a **same-environment** tolerance. No bitwise claim is made across BLAS implementations, library versions, thread counts or platforms, and the `kullback-leibler`/`mu` solver path is still unmeasured — the re-measurement named above is still owed.
 
 ## D005 — Upstream test failure at the pinned SHA is recorded as an upstream finding, not worked around
 
@@ -203,6 +221,22 @@ Trade-offs and negative evidence: the NO-GO blocks the claim that feature A's pr
 Consequences for the baseline and active feature set: nothing is promoted; `allow_scientific_promotion` is false at this tier and `scientific_adoption` is INCONCLUSIVE. P0-04 is unblocked regardless, because recovery metrics measure whether the right programs were found, which is independent of whether rank can be selected.
 Protocol/data versions superseded: none.
 Independent confirmation needed: yes — any replacement criterion must be pre-registered afresh, with its seed committed in advance, and evaluated on a run at a different seed. A criterion tested on the data that motivated it has no evidential force.
+
+## D013 — Spectra carry their unit system as data, because the alternative inverts the result
+
+Date/time: 2026-09-17, P0-04 session
+Type: implementation
+Related task, feature, gate: P0-04, gate P0
+Context: `program_recovery_cosine_v1` compares true spectra against cNMF's `median_spectra`. The truth is generated in count space; `median_spectra` lives in the engine's scaled space, where every gene has been divided by its training standard deviation `s_g` (PROTOCOL §3.2, `cnmf.py:542`). Cosine is invariant to scaling a *vector* but not to scaling each *coordinate* by a different `s_g` — that is a shear, and it rotates the vectors.
+Measured on the skeleton's SMOKE run at `K_true = 3`: **unaligned, the matched null beats the fitted solution at every rank in both folds** (fit 0.703 vs null 0.819 at `K_true`) — the metric would report that cNMF recovers programs *worse than a trivial average of the truth*. Aligned, the fit wins everywhere and peaks exactly at `K_true` (0.988 vs 0.850). Both routes to common units agree (0.9881 pushing truth into scaled space, 0.9888 pulling the dictionary into count space).
+Options considered: (a) document the required alignment in a docstring and align at each call site; (b) make units a property of the data, so that an unaligned comparison raises.
+Decision: **(b).** `cnmfbench/recovery.py` defines `Spectra(matrix, space, gene_labels)` with `space ∈ {"count", "scaled"}`; `recovery_cosine` raises `UnitMismatch` on a space or gene-axis mismatch rather than returning a number. `matched_null_spectra` inherits `truth.space`, so a null built from aligned truth cannot drift out of units.
+Reason: since the two routes agree, *which* alignment is used is free — **failing to choose is what breaks the metric**, and it breaks it silently, by returning a plausible number that reverses the finding. A docstring cannot fail a test run; a type that refuses can. This is the same argument D011 made for the provisional fence: the difference between the options is whether forgetting is possible.
+Evidence paths and experiment IDs: `cnmfbench/recovery.py`; `cnmfbench/tests/test_recovery.py`, 22 tests, including the full pre-registered corruption battery — label permutation, gene reordering and factor rescaling asserted **invariant to 1e-12**, and duplication, deletion, usage shuffling and noise replacement asserted to penalise. `usage_error` takes the `Alignment` as an argument and refuses one computed on a different fit, since re-deriving a matching from usages would choose the permutation that makes usages agree best and could disagree with the permutation the recovery score was computed on.
+Trade-offs and negative evidence: every call site must now name a space, which is friction at the boundary where raw arrays enter. The noise-replacement corruption lands *near* the matched null rather than near zero, because nonnegative random vectors are not orthogonal to anything — the test asserts that band rather than pretending the floor is 0.
+Consequences for the baseline and active feature set: none algorithmic; `src/cnmf/**` is untouched. `program_recovery_cosine_v1` and `usage_error_v1` are implemented but not yet wired into the runner.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no — the two alignment routes confirming each other is the check, and it is asserted in the suite.
 
 ## Entry template
 
