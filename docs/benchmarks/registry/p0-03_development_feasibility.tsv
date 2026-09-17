@@ -111,3 +111,72 @@ outer_1	10	422.0462	1.01418	0.6968549072083754
 ## software_status	PASS	(the run completed; cost accounting agrees across both files)
 ## scientific_adoption	INCONCLUSIVE	(a DEVELOPMENT run promotes nothing; allow_scientific_promotion is false)
 ## evidence_tier	DEVELOPMENT
+##
+## ============================================================================
+## CONVERGENCE DIAGNOSTIC, appended as a later row and not an edit to the above.
+## ============================================================================
+##
+## Permitted by the pre-registration's amendment, committed at 3ed5bae while the first run
+## was in flight and its verdict unknown. Its target was narrowed at ace91f7, BEFORE this run:
+##
+##   "Better convergence lowers observed error, which moves ratios TOWARD the floor and so
+##    can only make criterion 2's failure firmer -- it cannot rescue it. The real exposure is
+##    criterion 1: at max_iter=300 a K=10 fit has more parameters to move than a K=7 fit and
+##    is therefore further from convergence, which inflates error(K=10) relative to error(K=7)
+##    and could manufacture part of the observed 1.673 rise."
+##
+## Source run: results/exploratory/p0-03-dev-conv1000/, config development_conv1000.yaml,
+## identical to development.yaml except max_optimizer_iterations 300 -> 1000 (upstream default).
+##
+## ---- ANSWER: under-convergence is RULED OUT. The rise is real. ----
+##
+## sklearn ConvergenceWarnings fell from 73 to 22, so the change did what it was meant to do.
+## The loss curve did not follow: it moved by at most 5.1e-04 in relative terms, and several
+## points are bitwise identical between the two runs.
+##
+outer_split_id	candidate_rank	error_at_300_iters	error_at_1000_iters	relative_change
+outer_0	4	464.3887	464.3890	7.31e-07
+outer_0	5	420.7129	420.7129	0.00e+00
+outer_0	6	416.7054	416.7054	0.00e+00
+outer_0	7	414.8444	414.8444	0.00e+00
+outer_0	8	415.6046	415.3935	-5.08e-04
+outer_0	9	415.9959	416.0171	5.10e-05
+outer_0	10	416.4741	416.5053	7.49e-05
+outer_1	4	485.2017	485.2017	0.00e+00
+outer_1	5	430.1019	430.1018	-7.94e-08
+outer_1	6	424.1344	424.1344	-4.82e-09
+outer_1	7	420.3297	420.3298	2.38e-07
+outer_1	8	420.7909	420.8491	1.38e-04
+outer_1	9	421.5721	421.5484	-5.62e-05
+outer_1	10	422.0462	422.0299	-3.86e-05
+##
+## The three criteria, recomputed at max_optimizer_iterations = 1000:
+##
+quantity	at_300_iters	at_1000_iters
+mean_paired_difference	1.673107141129897	1.6804926839467906
+paired_se	0.06236374753217724	0.06532773871189394
+paired_t	26.828200795127643	25.724029594197948
+criterion_1_curve_structure	PASS	PASS
+criterion_2_not_flat_by_arithmetic	FAIL	FAIL
+criterion_3_silhouette_not_degenerate	PASS	PASS
+verdict	NO-GO	NO-GO
+##
+## The predicted-against-interest outcome did not occur: the K_true -> K_max rise did NOT
+## shrink. It grew marginally, 1.673 -> 1.680 (+0.4%), and t stayed at 25.7. Criterion 1's
+## evidence is therefore a property of the fits, not an artifact of stopping them early, and
+## the "the curve has structure" claim in the section above survives its own strongest
+## available challenge.
+##
+## Criterion 2 fails identically, as predicted before the run. Both ends genuinely sit within
+## 2% of the Poisson floor; that is a fact about this benchmark, not about the optimizer.
+##
+## THE VERDICT ABOVE IS UNCHANGED: NO-GO. The diagnostic removes a confound; it does not
+## reverse anything, and no criterion or threshold was touched.
+##
+## ---- INCIDENTAL: the silhouette is far more convergence-sensitive than the loss ----
+## silhouette_dynamic_range	outer_0: 0.28198 -> 0.19756	outer_1: 0.30108 -> 0.19973
+## A ~34% change in the stability curve's range against a <0.001% change in the loss curve.
+## Criterion 3 passes comfortably either way (both >> 1e-6), so nothing here depends on it,
+## but PROTOCOL 1.4's silhouette-based baseline selector reads exactly this quantity, and a
+## selector whose input moves by a third when only max_iter changes is worth knowing about
+## before P0-06 sets `delta`. Recorded, not acted on.
