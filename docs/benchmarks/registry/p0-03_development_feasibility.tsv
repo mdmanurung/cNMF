@@ -1,0 +1,113 @@
+## P0-03 DEVELOPMENT-tier feasibility verdict, 2026-09-17.
+##
+## Criteria pre-registered in p0-03_development_feasibility_PREREGISTRATION.md, committed at
+## f1e86fa BEFORE this run was launched. Git history is the evidence of that ordering. The
+## criteria are reproduced verbatim below and were NOT edited after the result was seen.
+##
+## Source run: results/exploratory/p0-03-dev-feasibility/ (gitignored; this is the tracked
+## record). Config docs/benchmarks/configs/development.yaml, configuration 000, scenario
+## base_identifiable, DEVELOPMENT tier, seed 90210, panel_seed 20260918.
+## 24 donors x 200 cells x 2000 genes, K_true = 7, ranks [4..10], 2 outer folds, 10 restarts.
+## dataset_manifest_hash 31b4cf0be1318aa35a67691aef54bfaaef942a54656a7ff448273c1ddff2a883
+## 610 RESULTS rows, 16 EXPERIMENTS rows, all status ok_provisional behind the five-component fence.
+##
+## ======================= VERDICT: NO-GO =======================
+## Criterion 2 fails. Criteria 1 and 3 pass. Per the pre-registered rule, "NO-GO if any fails".
+##
+## This verdict is recorded BEFORE any remediation or diagnostic re-run, and is not revised
+## by them. A later run is a later row, never an edit to this one.
+##
+## ---- CRITERION 1: curve structure -- PASS ----
+## "error(K_max) - error(K_true) > 3 x paired SE", paired per donor across all 24 donors.
+criterion	1_curve_structure
+n_paired_donors	24
+mean_paired_difference	1.673107141129897
+paired_se	0.06236374753217724
+paired_t	26.828200795127643
+threshold	mean_diff > 3 * se
+criterion_1_result	PASS
+##
+## Passes by a wide margin: t = 26.8 against a threshold of 3.
+##
+## ---- CRITERION 2: not flat by arithmetic -- FAIL ----
+## "Fail if observed(K_true)/floor < 1.02 AND observed(K_max)/floor < 1.02".
+## A single failing fold fails the run (pre-registered: "computed per fold").
+outer_split_id	poisson_floor_per_cell	observed_k7	observed_k10	ratio_k_true	ratio_k_max	criterion_2
+outer_0	408.2913746887883	414.84440796198106	416.47413062666607	1.0160498939714013	1.0200414616745574	PASS
+outer_1	416.14585634435315	420.32968508570076	422.0461767032755	1.0100537556185243	1.0141784911923764	FAIL
+criterion_2_result	FAIL
+##
+## outer_0 passes only because ratio_k_max = 1.02004 clears 1.02 in its fifth decimal place.
+## Recording that explicitly: the pass in outer_0 carries no evidential weight.
+##
+## ---- CRITERION 3: silhouette not degenerate -- PASS ----
+## "Dynamic range over the grid > 1e-6" (PROTOCOL 1.4).
+outer_split_id	silhouette_dynamic_range	degenerate_branch_would_fire	criterion_3
+outer_0	0.28198137190670036	False	PASS
+outer_1	0.30107763098585494	False	PASS
+criterion_3_result	PASS
+##
+## ======================= THE FULL CURVE, recorded because it is not what the verdict says
+##
+## The verdict stands as NO-GO. What follows is observation, not a revision of it, and is
+## recorded because suppressing it would misrepresent the run.
+##
+outer_split_id	candidate_rank	equal_donor_mean_heldout_sq_error	ratio_to_poisson_floor	silhouette
+outer_0	4	464.3887	1.13740	0.9906006318704736
+outer_0	5	420.7129	1.03042	0.9978194112239243
+outer_0	6	416.7054	1.02061	0.9965214236149822
+outer_0	7	414.8444	1.01605	0.9962157494263835
+outer_0	8	415.6046	1.01791	0.825507209925427
+outer_0	9	415.9959	1.01887	0.7881616396113754
+outer_0	10	416.4741	1.02004	0.7158380393172239
+outer_1	4	485.2017	1.16594	0.9969416819443238
+outer_1	5	430.1019	1.03354	0.9979325381942303
+outer_1	6	424.1344	1.01920	0.997206379571327
+outer_1	7	420.3297	1.01005	0.9968129476544636
+outer_1	8	420.7909	1.01116	0.8512904868249237
+outer_1	9	421.5721	1.01304	0.7517707946470912
+outer_1	10	422.0462	1.01418	0.6968549072083754
+##
+## The loss curve attains its minimum at K = 7 = K_true in BOTH folds, descends monotonically
+## from K=4 to K=7 and rises monotonically from K=7 to K=10. The silhouette holds ~0.996
+## through K=7 and drops sharply at K=8 (0.826, 0.851) in both folds. Two independent
+## signals place the elbow at K_true.
+##
+## ---- WHY CRITERION 2 FAILED ANYWAY, AND WHY THAT IS A DEFECT IN THE CRITERION ----
+##
+## Criterion 2 inspects only K_true and K_max. Its stated rationale in the pre-registration
+## is: "Both ends sitting on the irreducible Poisson floor means no selector can work,
+## whatever its rule, because there is no signal left to select on."
+##
+## That rationale is falsified by this run's own data. There IS signal: the curve spans
+## 1.137 -> 1.016 (outer_0) and 1.166 -> 1.010 (outer_1) across the grid, and criterion 1
+## resolves the K_true -> K_max rise at t = 26.8. The criterion measured the wrong span. It
+## looked only at the overfit side of the minimum, where the curve is by construction nearly
+## flat, and never at the underfit side, where this benchmark's dynamic range actually lives.
+##
+## It passed at SMOKE by an accident of that grid's shape: K_max = 4 there sat on the
+## underfit side of a K_true = 3 curve, so "K_max" happened to name a high-error point.
+## At this grid K_max = 10 names a low-error point. The same rule therefore tests a
+## different thing at the two tiers. That is a mis-specification, not a property of cNMF.
+##
+## THIS DOES NOT LICENSE OVERRIDING THE VERDICT. The pre-registration states plainly that
+## "changing the criteria above" is not permitted, and a criterion rewritten by the person
+## who has just seen it fail is worth nothing regardless of how sound the argument is. The
+## recorded verdict for this run is NO-GO.
+##
+## What the defect licenses instead is a SEPARATE, newly pre-registered criterion, written
+## with the explicit acknowledgement that it postdates this data, and evaluated on a FRESH
+## run at a different seed. A criterion tested on the data that motivated it has no
+## evidential force. See DECISIONS.md D012.
+##
+## ---- INCIDENTAL: thin identity-program carriers ----
+## n_training_carriers_per_identity_program = [12, 3, 3, 4, 1] (outer_0), [12, 3, 5, 4, 3] (outer_1).
+## One identity program has a SINGLE training carrier donor in outer_0. Recorded here because
+## it bears directly on feature A: a program carried by one donor cannot be learned in a way
+## that generalises across donors, and donor-blocked evaluation is the thing that would
+## expose that. Not acted on in this run.
+##
+## ---- SOFTWARE STATUS / SCIENTIFIC ADOPTION / EVIDENCE TIER, kept separate ----
+## software_status	PASS	(the run completed; cost accounting agrees across both files)
+## scientific_adoption	INCONCLUSIVE	(a DEVELOPMENT run promotes nothing; allow_scientific_promotion is false)
+## evidence_tier	DEVELOPMENT

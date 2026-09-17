@@ -121,5 +121,15 @@ measuring the benchmark honestly.
 
 ## Results
 
-Appended after the run, in `p0-03_development_feasibility.tsv`. This file is not edited
-again except to link that result.
+**Verdict: NO-GO.** Criterion 2 failed (fold `outer_1`); criteria 1 and 3 passed.
+Recorded in [`p0-03_development_feasibility.tsv`](p0-03_development_feasibility.tsv).
+
+The loss curve nevertheless attains its minimum at `K_true` in both folds, and criterion 2
+turned out to inspect only the overfit side of that minimum — where the curve is nearly flat
+by construction — so it tested a different quantity here than it did at SMOKE. That is a
+defect in the criterion, argued in the results file and in `DECISIONS.md` D012. It does not
+revise this verdict: a criterion rewritten by whoever has just watched it fail carries no
+weight, however sound the argument. A replacement is pre-registered separately and must be
+evaluated on a fresh run at a different seed.
+
+This file is not edited again except to link further results.
