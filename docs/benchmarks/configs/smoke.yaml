@@ -27,6 +27,17 @@ factorization:
   # Regression test: cnmfbench/tests/test_io_and_cnmf_interop.py
   optimizer_starts: 5
   max_optimizer_iterations: 300
+  # Must be < simulation.genes (180). Upstream defaults to 2000, which would make HVG
+  # selection a silent no-op here: it takes the top-N by Fano ratio, so N > n_genes
+  # returns every gene and the "high-variance panel" is the whole panel. That also makes
+  # hvg_retention trivially 1.0 and hides exactly the failure it exists to detect.
+  num_highvar_genes: 100
+  # Enters the consensus artifact FILENAME via str(x).replace('.','_') -> 'dt_2_0'
+  # (cnmf.py:878), so the identical Python value must reach consensus() and every reader.
+  # Upstream defaults to 0.5. Measured at this scale: local_density maxes at 0.012 (K=3)
+  # and 0.31 (K=4), so neither value filters any component -- the choice is about the
+  # filename being predictable, not about the filter doing anything.
+  density_threshold: 2.0
 validation:
   outer_donor_folds: 2
   inner_donor_folds: 2
@@ -35,6 +46,16 @@ validation:
   # detect. Changed before any comparison was run. This is a config value, not a
   # frozen PROTOCOL rule.
   inference_gene_fraction: 0.5
+  # PROTOCOL 4.1 requires the panel seed to be INDEPENDENT of the sampling seed and the
+  # optimizer seed, so that panel variation and optimisation variation can be separated.
+  # It is therefore a distinct value here, not derived from `seed` above. The throwaway
+  # diagnostics.donor_blocking_gap draws its panel from the same rng as the donor
+  # permutation; copying that would violate 4.1 silently.
+  panel_seed: 20260917
+  # Measured: sweeping this seed moves the K=3 held-out error by about +/-20% while the
+  # K3->K4 gap is 2-5%. One repetition therefore records a single draw of a nuisance
+  # larger than the effect it will later be used to detect. Raising it is P0-05 work; for
+  # now the variance is named rather than hidden.
   panel_repetitions: 1
   projection: nonnegative_least_squares_frozen_dictionary
   transform: training_fitted_and_leakage_audited
