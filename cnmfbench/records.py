@@ -99,24 +99,41 @@ EVALUATION_SCOPE = ("per_donor", "equal_donor_mean", "experiment")
 ARM = ("full_training_pool", "matched_budget", "upstream_full_data", "genenmf_native")
 
 
-def make_experiment_id(configuration, arm, dataset_id, outer_split_id, candidate_rank, seeds):
+def make_experiment_id(configuration, arm, dataset_id, outer_split_id, candidate_rank, seeds,
+                       variant=None):
     """Readable and deterministic. Same inputs ⇒ same id ⇒ a re-run is detectable.
 
     The trailing 12 hex characters disambiguate runs that differ only in seeds. §7's
     no-truncation rule governs hash *columns*; this is an identifier that embeds one, and
     the full provenance hashes live in `EXPERIMENTS.tsv` beside it.
+
+    **`variant` exists because the invariant above was violated.** The convergence diagnostic
+    re-ran the DEVELOPMENT tier with `max_optimizer_iterations` 300 → 1000: same configuration,
+    same arm, same dataset (`dataset_manifest_hash` identical — it genuinely is the same data),
+    same seeds, **different numbers**. None of this function's other inputs moved, so both runs
+    produced the same id, and `merge_into_tracked` correctly refused the second as a
+    contradiction. `preprocessing_hash` did differ, so the rows were distinguishable by
+    content but not by name.
+
+    A run that changes a factorization parameter while reusing a tier's identity must say so.
+    `variant` is that label, and it is folded into the digest **only when set**, so every id
+    written before it existed stays valid and no evidence needs regenerating. `dataset_id`
+    would have been the wrong place — the dataset is the same — and `arm` is a frozen protocol
+    vocabulary, not a scratchpad for diagnostics.
     """
-    digest = parameter_hash(
-        {
-            "configuration": configuration, "arm": arm, "dataset_id": dataset_id,
-            "outer_split_id": outer_split_id,
-            "candidate_rank": None if candidate_rank is None else int(candidate_rank),
-            "seeds": {k: int(v) for k, v in sorted(seeds.items())},
-            "protocol_version": PROTOCOL_VERSION,
-        }
-    )
+    payload = {
+        "configuration": configuration, "arm": arm, "dataset_id": dataset_id,
+        "outer_split_id": outer_split_id,
+        "candidate_rank": None if candidate_rank is None else int(candidate_rank),
+        "seeds": {k: int(v) for k, v in sorted(seeds.items())},
+        "protocol_version": PROTOCOL_VERSION,
+    }
+    if variant:
+        payload["variant"] = str(variant)
+    digest = parameter_hash(payload)
     rank = "fit" if candidate_rank is None else f"k{int(candidate_rank)}"
-    return f"{configuration}-{arm}-{dataset_id}-{outer_split_id}-{rank}-{digest[:12]}"
+    label = f"{dataset_id}-{variant}" if variant else dataset_id
+    return f"{configuration}-{arm}-{label}-{outer_split_id}-{rank}-{digest[:12]}"
 
 
 def _clean(value, column):

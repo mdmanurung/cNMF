@@ -242,6 +242,11 @@ def run(config_path, out_root, run_id=None, dry_run=False):
     scenario = cfg["scenario"]
     replicate = 0
     dataset_id = f"{scenario}_{tier}_r{replicate}"
+    # Optional label for a run that reuses a tier's identity while changing a factorization
+    # parameter. Absent for every ordinary run, so ordinary ids are unchanged. See
+    # records.make_experiment_id: without it, the convergence diagnostic collided with the
+    # run it was diagnosing.
+    variant = cfg.get("variant")
     ds = simulate(params, scenario, tier, seed_for(tier), simulation_replicate=replicate)
     write_dataset(ds, os.path.join(run_dir, "dataset"))
 
@@ -281,7 +286,8 @@ def run(config_path, out_root, run_id=None, dry_run=False):
             results.append(result_row(
                 experiment_id=make_experiment_id(CONFIGURATION, ARM_ID, dataset_id,
                                                  fold.outer_split_id, None,
-                                                 {"seed": cfg["seed"]}),
+                                                 {"seed": cfg["seed"]},
+                                                 variant=cfg.get("variant")),
                 configuration=CONFIGURATION, arm=ARM_ID, dataset_id=dataset_id,
                 independent_unit_id=fold.outer_split_id, independent_unit_type="experiment",
                 outer_split_id=fold.outer_split_id, metric="failed_fits_v1",
@@ -311,7 +317,8 @@ def _failed_experiment_row(fold, dataset_id, ds, cfg, fold_dir, prov, exc):
     now = _utc()
     return experiment_row(
         experiment_id=make_experiment_id(CONFIGURATION, ARM_ID, dataset_id,
-                                         fold.outer_split_id, None, {"seed": cfg["seed"]}),
+                                         fold.outer_split_id, None, {"seed": cfg["seed"]},
+                                         variant=cfg.get("variant")),
         prototype="true", feature_A="false", feature_B="false", feature_C="false",
         arm=ARM_ID, status="failed", evidence_tier=cfg["evidence_tier"],
         dataset_id=dataset_id, dataset_manifest_hash=ds.dataset_manifest_hash,
@@ -415,7 +422,7 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
     # with `candidate_rank` empty lets the total be recovered by summing, with no double
     # counting and no invented amortisation. The schema already allows this.
     fit_id = make_experiment_id(CONFIGURATION, ARM_ID, dataset_id, fold.outer_split_id,
-                                None, {"seed": cfg["seed"]})
+                                None, {"seed": cfg["seed"]}, variant=cfg.get("variant"))
     fit_cost = _cost(fit_wall, fit_cpu, _peak_mb(), 0)
     fit_common = dict(experiment_id=fit_id, configuration=CONFIGURATION, arm=ARM_ID,
                       dataset_id=dataset_id, outer_split_id=fold.outer_split_id,
@@ -463,7 +470,8 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
 
         exp_id = make_experiment_id(CONFIGURATION, ARM_ID, dataset_id, fold.outer_split_id, k,
                                     {"seed": cfg["seed"],
-                                     "panel_seed": cfg["validation"]["panel_seed"]})
+                                     "panel_seed": cfg["validation"]["panel_seed"]},
+                                    variant=cfg.get("variant"))
         artifact = os.path.relpath(obj.paths["consensus_spectra"] % (k, dt_repl), root)
         common = dict(experiment_id=exp_id, configuration=CONFIGURATION, arm=ARM_ID,
                       dataset_id=dataset_id, outer_split_id=fold.outer_split_id,

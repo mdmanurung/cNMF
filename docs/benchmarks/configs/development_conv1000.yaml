@@ -18,6 +18,11 @@
 # else. It still cannot promote a feature: allow_scientific_promotion is false.
 schema_version: 1
 profile: development
+# Distinguishes this run's experiment_ids from the run it diagnoses. Without it both runs
+# produce identical ids -- same configuration, arm, dataset and seeds, different numbers --
+# and merge_into_tracked correctly refuses the second as a contradiction. See
+# records.make_experiment_id.
+variant: conv1000
 evidence_tier: DEVELOPMENT
 allow_scientific_promotion: false
 

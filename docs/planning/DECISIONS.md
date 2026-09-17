@@ -238,6 +238,22 @@ Consequences for the baseline and active feature set: none algorithmic; `src/cnm
 Protocol/data versions superseded: none.
 Independent confirmation needed: no — the two alignment routes confirming each other is the check, and it is asserted in the suite.
 
+## D014 — `experiment_id` gains an optional `variant`, because the "same id ⇒ same experiment" invariant was violated in practice
+
+Date/time: 2026-09-17/18, feasibility session
+Type: implementation
+Related task, feature, gate: P0-03, P0-04, P0-07, gate P0
+Context: the convergence diagnostic re-ran the DEVELOPMENT tier with `max_optimizer_iterations` 300 → 1000. Same `configuration`, same `arm`, same `dataset_id`, same `dataset_manifest_hash` (the dataset genuinely *is* the same), same seeds — **different numbers**. `make_experiment_id` reads exactly those inputs, so both runs produced identical ids, and `merge_into_tracked` refused the second with "a repeated id with a possibly different value is a contradiction to resolve, not a duplicate to tolerate."
+The guard was right, and this is the second time this session that a check written earlier caught a defect that prose would have missed (the first being the fold-identity collision in the fit-cost test). `preprocessing_hash` **did** differ between the runs (`e61b9c7f…` vs `d1da4eee…`), so the rows were distinguishable by *content* but not by *name*.
+Options considered: (a) fold the factorization hyperparameters into the id digest; (b) put a distinguishing suffix on `dataset_id`; (c) add an optional `variant` label, folded into the digest only when set.
+Decision: **(c).** `make_experiment_id(..., variant=None)`; when set, the label enters both the digest and the readable prefix. `development_conv1000.yaml` carries `variant: conv1000`.
+Reason: (a) is correct in principle but changes **all 733 existing ids**, forcing a three-run replay to repair an identifier — a large self-inflicted regeneration whose benefit is captured more cheaply. (b) is wrong on the facts: `dataset_id` names the dataset, and the dataset is identical; so is `arm`, which is a frozen protocol vocabulary and not a scratchpad for diagnostics. (c) restores the invariant going forward at zero cost to existing evidence, because a payload key that is absent when unset leaves every previously computed digest bit-identical. The thing that was actually wrong is that a config changed a factorization parameter while reusing a tier's identity silently; `variant` makes it say so.
+Evidence paths and experiment IDs: `cnmfbench/records.py` (`make_experiment_id`); `cnmfbench/skeleton.py`, all four call sites; `docs/benchmarks/configs/development_conv1000.yaml`; two tests in `test_records_and_fence.py` pinning both halves — that a variant changes the id, and that its absence leaves ids untouched. 178 tests pass.
+Trade-offs and negative evidence: `variant` is free text, so it can be forgotten. Nothing forces a config that changes a factorization parameter to set it, and the failure mode if it is forgotten is the same collision — caught at merge time by the same guard, which is a detection rather than a prevention. A general fix (a) remains available and becomes cheap at the next occasion that regenerates evidence anyway; recorded here as the deferred stronger option rather than closed off.
+Consequences for the baseline and active feature set: none algorithmic; `src/cnmf/**` untouched. The diagnostic's 610 rows were **not** merged under colliding ids; the run is being repeated with the label set, and its scientific content was already committed at `b8ba39d` independently of the tracked TSVs.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>

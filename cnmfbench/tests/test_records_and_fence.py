@@ -299,3 +299,37 @@ def test_pooling_guard_refuses_rows_with_no_provenance():
 
     with pytest.raises(PoolingError, match="absent from EXPERIMENTS"):
         assert_poolable([{"experiment_id": "ghost"}], [])
+
+
+def test_a_variant_changes_the_id_and_its_absence_leaves_every_existing_id_untouched():
+    """The invariant `same id => same experiment` was violated in practice: the convergence
+    diagnostic re-ran DEVELOPMENT with max_optimizer_iterations 300 -> 1000, giving the same
+    configuration, arm, dataset and seeds with different numbers, so both runs produced the
+    same id and `merge_into_tracked` refused the second as a contradiction.
+
+    `variant` repairs it, and the second assertion is the one that matters for cost: because
+    the label is folded in ONLY when set, every id written before it existed stays valid and
+    no evidence needs regenerating.
+    """
+    args = ("000", "full_training_pool", "base_identifiable_DEVELOPMENT_r0", "outer_0", 7)
+    seeds = {"seed": 90210, "panel_seed": 20260918}
+    plain = R.make_experiment_id(*args, seeds)
+    with_variant = R.make_experiment_id(*args, seeds, variant="conv1000")
+
+    assert plain != with_variant, "a variant run must not collide with the run it diagnoses"
+    assert "conv1000" in with_variant, "the label must be readable in the id, not only hashed"
+    assert R.make_experiment_id(*args, seeds, variant=None) == plain
+    assert R.make_experiment_id(*args, seeds, variant="") == plain
+
+
+def test_every_tracked_id_still_matches_what_the_current_code_produces():
+    """Guards the claim above against drift: if a later change to `make_experiment_id` alters
+    ids that are already written, this fails rather than silently orphaning the evidence."""
+    experiments = _tracked("EXPERIMENTS.tsv")
+    if not experiments:
+        pytest.skip("no rows written yet")
+    for e in experiments:
+        prefix = f"{e['configuration'] if 'configuration' in e else '000'}-{e['arm']}-{e['dataset_id']}-"
+        assert e["experiment_id"].startswith(prefix), (
+            f"{e['experiment_id']} no longer matches the id scheme its own columns imply"
+        )
