@@ -145,6 +145,14 @@ def feasibility_verdict(rows, diagnostics, k_true, k_max):
 
 
 def _fold_mean(rows, outer_split_id, k):
+    """Returns the FIRST matching row, so `rows` must come from a single run.
+
+    `verdict_for_run` only ever hands it one run's own shard, which is why this is safe today.
+    Handed the tracked `RESULTS.tsv` it would not be: that file now holds two DEVELOPMENT runs
+    whose `outer_split_id` and `candidate_rank` are identical, and this would silently take
+    whichever appears first. Use `assert_poolable` before aggregating anything that crosses
+    runs.
+    """
     for r in rows:
         if (r["metric"] == PRIMARY_LOSS and r["evaluation_scope"] == "equal_donor_mean"
                 and r["outer_split_id"] == outer_split_id and r["candidate_rank"] == str(k)):

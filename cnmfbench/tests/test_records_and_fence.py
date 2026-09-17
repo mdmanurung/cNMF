@@ -325,14 +325,30 @@ def test_a_variant_changes_the_id_and_its_absence_leaves_every_existing_id_untou
     assert R.make_experiment_id(*args, seeds, variant="") == plain
 
 
-def test_every_tracked_id_still_matches_what_the_current_code_produces():
-    """Guards the claim above against drift: if a later change to `make_experiment_id` alters
-    ids that are already written, this fails rather than silently orphaning the evidence."""
+def test_every_tracked_id_is_shaped_like_its_own_columns():
+    """Checks the readable *prefix* of each tracked id against the columns that can supply it.
+
+    Deliberately narrow, and the docstring says so because an earlier version of this test
+    overclaimed. **It cannot verify that ids are unchanged**, which is D014's actual claim: it
+    never inspects the digest, so a change to `make_experiment_id`'s payload would leave every
+    prefix intact and this test green.
+
+    A faithful round-trip is not possible against the current schema. `EXPERIMENTS.tsv` has no
+    `configuration` column, no `seeds` and no `variant`, so **a row does not carry enough to
+    reconstruct its own `experiment_id`** — recorded as a second D014 trade-off rather than
+    papered over with a test that looks stronger than it is. Adding those columns is a header
+    change, which is P0-07's business.
+    """
     experiments = _tracked("EXPERIMENTS.tsv")
     if not experiments:
         pytest.skip("no rows written yet")
     for e in experiments:
-        prefix = f"{e['configuration'] if 'configuration' in e else '000'}-{e['arm']}-{e['dataset_id']}-"
-        assert e["experiment_id"].startswith(prefix), (
-            f"{e['experiment_id']} no longer matches the id scheme its own columns imply"
+        head, _, tail = e["experiment_id"].partition(f"-{e['arm']}-")
+        assert tail, f"{e['experiment_id']} does not contain its own arm {e['arm']!r}"
+        assert head, f"{e['experiment_id']} has no configuration segment"
+        assert tail.startswith(e["dataset_id"]), (
+            f"{e['experiment_id']} does not carry its own dataset_id {e['dataset_id']!r}"
+        )
+        assert e["outer_split_id"] in tail, (
+            f"{e['experiment_id']} does not carry its own outer_split_id"
         )

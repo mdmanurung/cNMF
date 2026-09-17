@@ -2,7 +2,7 @@
 
 **Specification prepared:** 15 September 2026  
 **Target repository:** `dylkot/cNMF`  
-**Current state:** IN_PROGRESS — S0 closed, protocol frozen at v1.0.1, simulator built and measured, the benchmark loop closes end to end, and the DEVELOPMENT tier has been run under a pre-registered feasibility gate: `RESULTS.tsv` holds 732 rows and `EXPERIMENTS.tsv` 24, across `SMOKE` and `DEVELOPMENT`  
+**Current state:** IN_PROGRESS — S0 closed, protocol frozen at v1.0.1, simulator built and measured, the benchmark loop closes end to end, and the DEVELOPMENT tier has been run under a pre-registered feasibility gate: `RESULTS.tsv` holds 1342 rows and `EXPERIMENTS.tsv` 40, across `SMOKE` and two `DEVELOPMENT` runs  
 **Important:** No target-package code has been modified. The first rows exist but **establish execution, not scientific benefit** — `smoke_can_promote_feature: false` and `allow_scientific_promotion: false` make them unusable for any adoption decision, and every row carries `status: ok_provisional` because throwaway components produced it.
 
 ## 1. Session dashboard
@@ -22,9 +22,9 @@
 | Protocol version/hash | **FROZEN — v1.0.1**, `docs/planning/PROTOCOL.md`, sha256 `715639895663bc74e7b864bc1cfae60c2fcd05b013e25f23016d45e86f4f9ca5`, recorded in `ablation_plan.yaml` (`protocol.state: frozen`). `confirmation_unlocked: false` — two constants are null by design (`delta` §2, precision/recall threshold §5.2), both set on development controls at the start of P1, which creates v1.1 |
 | Baseline selector specification | **SPECIFIED, NOT RUNNABLE.** Equation and all four edge cases frozen in PROTOCOL.md §1/§1.4: `K* = max{K : silhouette(K) ≥ max silhouette − delta}` (largest-among-stable, *not* argmax — see §1.2 for why argmax would rig P1). `delta` is null, so the selector **refuses to run**. Not yet implemented in code (P0-06) |
 | Recommended configuration | None, and none is possible yet — no configuration has been evaluated. `000` is the *reference*, not a recommendation |
-| Latest evidence tier | **DEVELOPMENT** — 610 rows + 16 experiments at DEVELOPMENT, plus 122 + 8 at SMOKE; configuration `000`, all `status: ok_provisional`, `selected_rank` null throughout. `allow_scientific_promotion: false`, so this informs design and promotes nothing |
+| Latest evidence tier | **DEVELOPMENT** — two runs, 610 + 610 rows and 16 + 16 experiments (the second is the `variant: conv1000` convergence diagnostic), plus 122 + 8 at SMOKE: **1342 / 40** tracked. Configuration `000`, all `status: ok_provisional`, `selected_rank` null throughout. `allow_scientific_promotion: false`, so this informs design and promotes nothing |
 | Last update by implementing agent | Feasibility + P0-04 session, 2026-09-17/18 |
-| Session checkpoint | S0-01, S0-02, S0-03, P0-01, **P0-03 DONE**. Protocol frozen at v1.0.1. P0-06 IN_PROGRESS (spec written, `delta` null, no code). 176 harness tests pass; 732 + 24 rows written across SMOKE and DEVELOPMENT. **The DEVELOPMENT feasibility gate returned NO-GO** on a pre-registered criterion that D012 shows to be mis-specified; the verdict stands and a replacement is pre-registered for a fresh seed. P0-04's metrics, corruption battery and D004 obligations are complete but not yet wired into the runner. Five components remain fenced (`cnmfbench/provisional.py`, D011) and the P0 gate cannot close until they are hardened |
+| Session checkpoint | S0-01, S0-02, S0-03, P0-01, **P0-03 DONE**. Protocol frozen at v1.0.1. P0-06 IN_PROGRESS (spec written, `delta` null, no code). 178 harness tests pass; 1342 + 40 rows written across SMOKE and two DEVELOPMENT runs. **The DEVELOPMENT feasibility gate returned NO-GO** on a pre-registered criterion that D012 shows to be mis-specified; the verdict stands and a replacement is pre-registered for a fresh seed. P0-04's metrics, corruption battery and D004 obligations are complete but not yet wired into the runner. Five components remain fenced (`cnmfbench/provisional.py`, D011) and the P0 gate cannot close until they are hardened |
 
 ## 2. Progress counts
 
@@ -448,6 +448,51 @@ P0-04 implements **program recovery, usage accuracy, and the corruption battery*
 **D004 obliges two things at P0-04, not after:** confirm or revise the 1e-5 tolerance against corruption sensitivity, and **set the absolute floor for near-zero artifacts before the first such artifact appears**, since choosing it afterwards would be choosing it against a known case.
 
 Then P0-02 / P0-05 hardening, the P0 gate, then P1/A. The user's target is the first `000` vs `100` comparison. Approved plan: `/home/mdmanurung/.claude/plans/plan-the-next-steps-warm-tome.md`.
+
+### Session 2026-09-17/18 — the feasibility gate, its NO-GO, and P0-04's metrics (Claude Code)
+
+- Starting task and code revision: continue the approved plan, at `da5728c` (harness) / `5dbc5ba` (upstream). `src/cnmf/**` unmodified throughout and re-verified byte-identical after every commit (`git diff 5dbc5ba..HEAD --stat -- src/ tests/ setup.py pyproject.toml` empty)
+- Environment: `module load tools/miniconda/python3.10/23.3.1 && source activate cnmf_bench`, with `OMP_NUM_THREADS=OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=1` before every measurement
+
+**Commands run, with outcomes:**
+
+| command | outcome |
+|---|---|
+| `python -m cnmfbench.skeleton --config docs/benchmarks/configs/development.yaml --run-id p0-03-dev-feasibility` | exit 0, ~4m55s, 610 results / 16 experiments |
+| `python -m cnmfbench.analysis results/exploratory/p0-03-dev-feasibility` | exit 0 — **verdict NO-GO** |
+| `python -m cnmfbench.skeleton --config docs/benchmarks/configs/development_conv1000.yaml --run-id p0-03-dev-conv1000` | exit 0, ~9m00s — merge **refused** (id collision, D014) |
+| `python -m cnmfbench.skeleton --config .../development_conv1000.yaml --run-id p0-03-dev-conv1000-v2` | exit 0, ~12m40s, merged cleanly with `variant: conv1000` |
+| `python -m cnmfbench.skeleton --merge results/exploratory/{p0-03-dev-feasibility,p0-03-dev-conv1000-v2}` | exit 0 — tracked files now **1342 / 40** |
+| `python -m pytest cnmfbench -q` | exit 0 — **178 passed** |
+
+**The headline result: the DEVELOPMENT feasibility gate returned NO-GO, and the criterion that produced it is mis-specified.** This is the hardest thing in this session to reconstruct from the commit log, so it is stated in full:
+
+- Criteria were pre-registered and committed at `f1e86fa` **before** the run. Git history is the evidence of that ordering.
+- Criterion 1 passed decisively (paired t = 26.8 over 24 donors). Criterion 3 passed (silhouette ranges 0.282, 0.301). **Criterion 2 failed** in `outer_1`, and `outer_0` passed it only in the fifth decimal place. Under the pre-registered rule, NO-GO.
+- **But the loss curve minimises at `K_true` = 7 in both folds**, descending from ratio 1.137/1.166 at K=4 and rising monotonically after 7; the silhouette holds ~0.996 through K=7 and drops sharply at K=8 in both folds. Two independent signals put the elbow at `K_true`.
+- Criterion 2 inspects only `K_true` and `K_max` — **both on the overfit side of the minimum**, where the curve is flat by construction. Its stated rationale ("no signal left to select on") is falsified by the run's own data. It passed at SMOKE only because that grid's `K_max = 4` sat on the *underfit* side of a `K_true = 3` curve, so the same sentence tested a different quantity at the two tiers.
+- **The verdict was not overridden.** A criterion rewritten by whoever just watched it fail is worth nothing however sound the argument. D012 records the defect as an argument; a replacement (criterion 2′, the `K_min → K_true` span, reusing the already-approved `3 × paired SE` constant) is pre-registered in `registry/p0-03_feasibility_criterion_v2_PREREGISTRATION.md` with its **seed committed in advance** (`seed: 31337`, `panel_seed: 20260919`) and must be judged on a fresh run it did not motivate. It is also stated in advance that it is expected to pass and therefore carries little discriminating power on this dataset.
+- **The v1 remediation menu was itself under-specified** and this is the lesson for the v1.1 amendment: its four options all assume the *benchmark* failed. Options 1–3 strengthen a benchmark that already resolves rank; option 4 ("report that §6.3 cannot support predictive rank selection") would be a **false report** given this curve. There was no branch for *the instrument being wrong*.
+
+**The convergence diagnostic answered the question it was aimed at.** The amendment permitting it was committed at `3ed5bae` while the first run was in flight; its target was narrowed at `ace91f7` **before** the diagnostic ran, to criterion **1** rather than 2 — better convergence lowers error and so can only firm up criterion 2's failure, whereas a K=10 fit under-converges harder than a K=7 fit and could have manufactured the 1.673 rise. Result: `ConvergenceWarning`s fell 73 → 22 at `max_iter=1000`, the loss curve moved by at most 5.1e-04 relative (several points bitwise identical), and the rise grew slightly to 1.680 at t = 25.7. **Under-convergence is ruled out; the NO-GO stands for scientific reasons.** Incidental: the silhouette dynamic range moved ~34% (0.282 → 0.198, 0.301 → 0.200) against a <0.001% move in the loss — PROTOCOL §1.4's baseline selector reads exactly that quantity, which matters before P0-06 sets `delta`.
+
+**P0-04, mostly done.** `cnmfbench/recovery.py` and `cnmfbench/compare.py`, 29 + 9 tests:
+
+- `program_recovery_cosine_v1` — Hungarian matching with dummy factors, dividing by `max(K_true, K_fitted)`. `Spectra` carries its unit system as data and `recovery_cosine` **raises** on a mismatch (D013), because the unaligned comparison is not merely wrong but *reversed*: the matched null beats the fit at every rank in both folds. The two alignment routes agree to 1e-12, so the choice is free and only failing to choose breaks it
+- `usage_error_v1` — takes the `Alignment` as an argument and refuses one from a different fit; missing and extra programs retained as error
+- Corruption battery complete: label permutation, gene reordering and factor rescaling **invariant to 1e-12**; duplication, deletion, usage shuffling and noise replacement penalised, with noise landing near the matched null rather than near zero
+- `program_precision_v1`, `program_recall_v1` and the `ambiguous` count implemented **and refusing**; `top2_cosine_gaps` records the distribution a threshold would later be calibrated against
+- **D004 discharged.** (i) 1e-5 **CONFIRMED**: float32 round-trip noise 2.5e-8 (400× below), one gene +50% 3.6e-3 (360× above), program swap 5.7e-1. (ii) Near-zero floor **1e-12**, set while no near-zero artifact exists — the only condition under which choosing it is honest
+
+**Two defects found by checks written earlier, which is the argument D011 made:**
+
+1. `merge_into_tracked` refused the diagnostic's rows: `make_experiment_id` had no way to express "same dataset and seeds, different factorization parameter", so both runs produced identical ids. Fixed with an optional `variant` folded into the digest **only when set**, leaving all existing ids bit-identical (D014). Adding the hyperparameters to the digest would have been correct in principle and forced a three-run replay to repair an identifier
+2. `test_shared_fit_cost_is_attributed_exactly_once` collided twice as the tracked file grew — first on `outer_split_id` alone, then on `dataset_id` plus the configuration bits, because `variant` appears only inside `experiment_id`. Now keyed on the id's fold prefix
+
+- Decisions recorded: **D012** (the NO-GO and the mis-specification), **D013** (unit-tagged spectra), **D014** (`variant`), and D004 moved PROVISIONAL → **CONFIRMED**
+- `docs/planning/contracts/A.md` written, closing the obligation to restate feature A's hypothesis before P1: it now says *"measures generalisation to unseen donors, which random-cell CV overestimates"* and records the three-arm measurement that killed the leakage framing (leakage at fixed donor count t = −0.37; donor count t = +4.30). New supporting evidence from this session: in `outer_0` one identity program has a **single** training carrier donor, which no random-cell split can ever place out of sample. Every margin remains `NOT_SET`
+- Next task: **finish P0-04** — wire `program_recovery_cosine_v1` and `usage_error_v1` into the runner so they write rows. Then P0-05
+- Exact next command: `python -m pytest cnmfbench -q` to confirm 178 green, then edit `cnmfbench/skeleton.py`'s per-rank block to score recovery against `ds.true_spectra` restricted to the fold's `G`, aligned with `.to_scaled(s_g)`, with `matched_null_spectra` beside it
 
 ### Five components are fenced as throwaway, and the P0 gate reads the fence
 
