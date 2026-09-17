@@ -39,7 +39,22 @@ __all__ = [
     "recovery_cosine",
     "matched_null_spectra",
     "usage_error",
+    "ThresholdNotCalibrated",
+    "program_precision_recall",
+    "top2_cosine_gaps",
+    "ambiguous_program_count",
 ]
+
+
+class ThresholdNotCalibrated(RuntimeError):
+    """A metric whose constant PROTOCOL §5.2 leaves null was asked for a number.
+
+    The refusal is the feature. The code exists and is tested; what does not exist is a
+    threshold, and inventing one here — having already seen this data — is exactly what the
+    null-until-calibrated policy prevents. Same pattern as the rank selector while `delta`
+    is null.
+    """
+
 
 SPACES = ("count", "scaled")
 
@@ -276,3 +291,84 @@ def usage_error(true_usages, fitted_usages, alignment):
         columns.append(-f[:, j])
     per_cell = np.abs(np.column_stack(columns)).sum(axis=1)
     return float(per_cell.mean()), per_cell
+
+
+# ------------------------------------------------- metrics that exist in order to refuse
+
+RECOVERY_THRESHOLD = None  # PROTOCOL §5.2 leaves it null; set at P1 on development controls.
+AMBIGUITY_THRESHOLD = None  # §5.2 requires the count but defines no threshold. See below.
+
+
+def program_precision_recall(alignment, threshold=RECOVERY_THRESHOLD):
+    """`program_precision_v1` / `program_recall_v1`. **Refuses while the threshold is null.**
+
+    The computation is trivial once a threshold exists — a true program counts as recovered
+    when its matched cosine clears `threshold`; precision divides by `K_fitted`, recall by
+    `K_true`. What is missing is the threshold, and it is missing on purpose: §5.2 leaves it
+    null, and picking a value now, after seeing that fitted programs score ~0.99 and a
+    trivial null scores ~0.85, would be choosing the constant against known data.
+
+    The narrowness of that band is the whole difficulty. Any threshold between 0.85 and 0.99
+    is defensible in isolation and they give very different answers, so the choice has to be
+    made against development *controls* — a null, a duplicated factor, a deleted program —
+    not against a fit whose score is already known.
+
+    Passing an explicit `threshold` is allowed so the arithmetic stays testable; it does not
+    constitute calibration and nothing may write these metrics to `RESULTS.tsv` until §5.2
+    carries a value.
+    """
+    if threshold is None:
+        raise ThresholdNotCalibrated(
+            "program_precision_v1 / program_recall_v1 need a cosine threshold that PROTOCOL "
+            "§5.2 leaves null by design. Refusing rather than inventing one: measured, a "
+            "fitted program scores ~0.99 and a trivial matched null ~0.85, so every value in "
+            "between is defensible and they disagree. Calibrate at P1 against development "
+            "controls, record it in §5.2, then pass it explicitly."
+        )
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError(f"threshold must lie in [0, 1], got {threshold}")
+    recovered = sum(1 for c in alignment.cosines if c >= threshold)
+    return {
+        "program_precision_v1": float(recovered / alignment.n_fitted) if alignment.n_fitted else 0.0,
+        "program_recall_v1": float(recovered / alignment.n_true) if alignment.n_true else 0.0,
+        "threshold": float(threshold),
+        "n_recovered": int(recovered),
+    }
+
+
+def top2_cosine_gaps(truth, fitted):
+    """Per true program, the gap between its best and second-best fitted match.
+
+    Recorded as a **distribution**, which is the part that can be honestly computed now. §5.2
+    requires an `ambiguous` count but defines no threshold for it, so the distribution is the
+    evidence a threshold would later be calibrated against — gathering it first and choosing
+    the constant second is the right order, and it is the order that was available here.
+    """
+    if truth.space != fitted.space:
+        raise UnitMismatch(f"{truth.space!r} vs {fitted.space!r}; align before scoring")
+    if truth.gene_labels != fitted.gene_labels:
+        raise UnitMismatch("different gene axes; align with .subset_genes() first")
+    t = _rows_unit_norm(np.asarray(truth.matrix, dtype=float))
+    f = _rows_unit_norm(np.asarray(fitted.matrix, dtype=float))
+    cos = t @ f.T
+    if cos.shape[1] < 2:
+        # With one fitted program there is no second best, so no gap is defined. Returning
+        # zeros would read as "maximally ambiguous", which is a different claim.
+        raise ValueError("top-2 gaps need at least 2 fitted programs")
+    ordered = np.sort(cos, axis=1)
+    return tuple(float(g) for g in ordered[:, -1] - ordered[:, -2])
+
+
+def ambiguous_program_count(gaps, threshold=AMBIGUITY_THRESHOLD):
+    """The §5.2 `ambiguous` count. **Refuses while its threshold is null**, like the above."""
+    if threshold is None:
+        raise ThresholdNotCalibrated(
+            "the `ambiguous` count needs a top-2 cosine gap threshold that PROTOCOL §5.2 "
+            "requires but does not define. Refusing rather than inventing one, having "
+            "already seen this data. Use top2_cosine_gaps() to record the distribution; "
+            "batch the constant into the v1.1 amendment alongside `delta` and the "
+            "precision/recall threshold."
+        )
+    if threshold < 0:
+        raise ValueError(f"threshold must be >= 0, got {threshold}")
+    return int(sum(1 for g in gaps if g < threshold))

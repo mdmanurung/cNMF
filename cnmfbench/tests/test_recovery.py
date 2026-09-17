@@ -13,7 +13,11 @@ from cnmfbench.recovery import (
     Spectra,
     UnitMismatch,
     matched_null_spectra,
+    ThresholdNotCalibrated,
+    ambiguous_program_count,
+    program_precision_recall,
     recovery_cosine,
+    top2_cosine_gaps,
     usage_error,
 )
 
@@ -243,3 +247,67 @@ def test_usage_error_is_invariant_to_per_cell_rescaling():
     u = _usages()
     scaled = u * np.linspace(0.1, 9.0, u.shape[0])[:, None]
     assert usage_error(u, scaled, align)[0] == pytest.approx(0.0, abs=1e-12)
+
+
+# ------------------------------------------------------------------ metrics that refuse
+
+def test_precision_and_recall_refuse_while_the_threshold_is_null():
+    """§5.2 leaves the threshold null by design. The code exists; the constant does not, and
+    choosing one after seeing that fits score ~0.99 and the null ~0.85 is what the
+    null-until-calibrated policy exists to prevent."""
+    truth = _truth()
+    _, align = recovery_cosine(truth, Spectra(truth.matrix.copy(), "count", truth.gene_labels))
+    with pytest.raises(ThresholdNotCalibrated, match="§5.2 leaves null"):
+        program_precision_recall(align)
+
+
+def test_precision_and_recall_still_compute_when_a_threshold_is_passed_explicitly():
+    """The arithmetic stays testable. Passing a value is not calibration and nothing may
+    write these to RESULTS.tsv until §5.2 carries one."""
+    truth = _truth()
+    _, align = recovery_cosine(truth, Spectra(truth.matrix.copy(), "count", truth.gene_labels))
+    out = program_precision_recall(align, threshold=0.9)
+    assert out["program_precision_v1"] == pytest.approx(1.0)
+    assert out["program_recall_v1"] == pytest.approx(1.0)
+    assert out["n_recovered"] == 3
+
+
+def test_recall_falls_when_a_true_program_is_missed():
+    truth = _truth()
+    _, align = recovery_cosine(truth, Spectra(truth.matrix[:2].copy(), "count", truth.gene_labels))
+    out = program_precision_recall(align, threshold=0.9)
+    assert out["program_recall_v1"] == pytest.approx(2.0 / 3.0)
+
+
+def test_the_ambiguous_count_refuses_while_its_threshold_is_null():
+    """§5.2 requires the count but defines no threshold for it."""
+    truth = _truth()
+    gaps = top2_cosine_gaps(truth, Spectra(truth.matrix.copy(), "count", truth.gene_labels))
+    with pytest.raises(ThresholdNotCalibrated, match="v1.1 amendment"):
+        ambiguous_program_count(gaps)
+
+
+def test_the_gap_distribution_is_computable_even_though_the_count_is_not():
+    """Gathering the evidence first and choosing the constant second is the right order, and
+    it is the order available here."""
+    truth = _truth()
+    gaps = top2_cosine_gaps(truth, Spectra(truth.matrix.copy(), "count", truth.gene_labels))
+    assert len(gaps) == 3
+    assert all(0.0 <= g <= 1.0 for g in gaps)
+    assert ambiguous_program_count(gaps, threshold=0.0) == 0
+
+
+def test_gaps_need_at_least_two_fitted_programs():
+    """One fitted program has no second best; returning zeros would read as 'maximally
+    ambiguous', which is a different claim."""
+    truth = _truth()
+    with pytest.raises(ValueError, match="at least 2"):
+        top2_cosine_gaps(truth, Spectra(truth.matrix[:1].copy(), "count", truth.gene_labels))
+
+
+def test_duplicated_factors_produce_small_gaps():
+    """The signal a calibrated threshold would eventually read: a duplicated factor leaves
+    its true program with two near-equal matches."""
+    truth = _truth()
+    dup = Spectra(np.vstack([truth.matrix, truth.matrix[0:1]]), "count", truth.gene_labels)
+    assert min(top2_cosine_gaps(truth, dup)) == pytest.approx(0.0, abs=1e-12)
