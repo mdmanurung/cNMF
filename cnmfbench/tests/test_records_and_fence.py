@@ -181,16 +181,19 @@ def test_shared_fit_cost_is_attributed_exactly_once():
     experiments = _tracked("EXPERIMENTS.tsv")
     if not experiments:
         pytest.skip("no rows written yet")
-    # Group by the whole fold identity, not by `outer_split_id` alone. Every run names its
-    # folds `outer_0`, `outer_1`, ..., so once the tracked file holds more than one run the
-    # bare split id collides across them and this test reads two runs' fit rows as two fit
-    # rows for one fold. `dataset_id` carries scenario, tier and replicate; with the
-    # configuration bits and the split id it identifies the fold uniquely.
+    # Group by the fold identity carried in `experiment_id` itself, which is
+    # `{configuration}-{arm}-{dataset_id}[-{variant}]-{outer_split_id}-{rank}-{digest}`;
+    # dropping the last two segments leaves exactly the fold.
+    #
+    # Two weaker keys were tried and both collided. `outer_split_id` alone collides across
+    # runs, since every run names its folds `outer_0`, `outer_1`, ... Adding `dataset_id` and
+    # the configuration bits still collides, because a `variant` run reuses the same dataset
+    # and the label appears **only inside the id** — EXPERIMENTS.tsv has no `variant` column
+    # (D014's recorded trade-off; `preprocessing_hash` is what distinguishes such rows by
+    # content). The id prefix is the one key that carries every distinction.
     by_fold = {}
     for e in experiments:
-        key = (e["dataset_id"], e["outer_split_id"], e["arm"],
-               e["feature_A"], e["feature_B"], e["feature_C"])
-        by_fold.setdefault(key, []).append(e)
+        by_fold.setdefault(tuple(e["experiment_id"].split("-")[:-2]), []).append(e)
     for fold, rows in by_fold.items():
         fit = [r for r in rows if r["candidate_rank"] == ""]
         per_rank = [r for r in rows if r["candidate_rank"] != ""]

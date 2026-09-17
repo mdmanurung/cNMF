@@ -180,3 +180,15 @@ verdict	NO-GO	NO-GO
 ## but PROTOCOL 1.4's silhouette-based baseline selector reads exactly this quantity, and a
 ## selector whose input moves by a third when only max_iter changes is worth knowing about
 ## before P0-06 sets `delta`. Recorded, not acted on.
+##
+## ---- The diagnostic was re-run once, with a `variant` label. Both attempts reported. ----
+## The first attempt (p0-03-dev-conv1000) could not be merged: its experiment_ids collided
+## with the run it was diagnosing, because make_experiment_id had no way to express "same
+## dataset and seeds, different factorization parameter". See DECISIONS.md D014. The re-run
+## (p0-03-dev-conv1000-v2) carries `variant: conv1000` and merges cleanly.
+##
+## The two attempts agree to every printed digit -- mean_paired_difference
+## 1.6804926839467906 in both -- so the re-run changed the identifiers and nothing else.
+## Reporting both rather than silently keeping the one that merged: a discarded attempt is a
+## fabricated result. Incidentally this is also a determinism check the programme had not
+## otherwise performed at DEVELOPMENT scale, and it passed.
