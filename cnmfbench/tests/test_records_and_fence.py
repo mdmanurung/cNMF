@@ -146,6 +146,65 @@ def test_merge_rejects_a_mismatched_header(tmp_path):
         R.merge_into_tracked(str(path), [], R.RESULTS_COLUMNS)
 
 
+# ------------------------------------------------- the committed evidence is consistent
+
+
+def _tracked(name):
+    with open(os.path.join(REPO, "docs/benchmarks", name), newline="", encoding="utf-8") as fh:
+        return list(csv.DictReader(fh, delimiter="\t"))
+
+
+def test_results_and_experiments_agree_on_cost():
+    """The defect this guards against shipped once: RESULTS timed only the marginal
+    consensus+scoring while EXPERIMENTS added an amortised share of the shared fit, so the
+    two files disagreed by ~2.2x for the same experiment_id and the column a comparison
+    reads made factorization free. Both are now rendered from one object; this keeps them
+    that way."""
+    results = {(r["experiment_id"], r["metric"]): r["value"] for r in _tracked("RESULTS.tsv")}
+    experiments = _tracked("EXPERIMENTS.tsv")
+    if not experiments:
+        pytest.skip("no rows written yet")
+    for e in experiments:
+        for metric, column in (("wall_seconds_v1", "wall_seconds"),
+                               ("cpu_seconds_v1", "cpu_seconds"),
+                               ("peak_memory_mb_v1", "peak_memory_mb")):
+            assert results[(e["experiment_id"], metric)] == e[column], (
+                f"{e['experiment_id']}: {metric} != {column}"
+            )
+
+
+def test_shared_fit_cost_is_attributed_exactly_once():
+    """One prepare/factorize/combine per fold serves every candidate rank, so its cost
+    belongs to no single rank. It gets its own row with candidate_rank empty; per-rank
+    rows carry marginal cost only. Summing the fold's rows therefore gives the true total
+    with no double counting."""
+    experiments = _tracked("EXPERIMENTS.tsv")
+    if not experiments:
+        pytest.skip("no rows written yet")
+    by_fold = {}
+    for e in experiments:
+        by_fold.setdefault(e["outer_split_id"], []).append(e)
+    for fold, rows in by_fold.items():
+        fit = [r for r in rows if r["candidate_rank"] == ""]
+        per_rank = [r for r in rows if r["candidate_rank"] != ""]
+        assert len(fit) == 1, f"{fold}: expected exactly one fit-scope row, got {len(fit)}"
+        assert per_rank, f"{fold}: no per-rank rows"
+        # The shared fit dominates; a per-rank row carrying it too would show up here.
+        assert float(fit[0]["wall_seconds"]) > max(float(r["wall_seconds"]) for r in per_rank)
+
+
+def test_every_written_row_is_provisional_and_cannot_promote():
+    """While the fence stands, every row must say so and must sit at a tier that cannot
+    promote a feature. The two must not drift apart."""
+    rows = _tracked("RESULTS.tsv")
+    if not rows:
+        pytest.skip("no rows written yet")
+    assert not P.registry_is_empty()
+    assert {r["status"] for r in rows} == {"ok_provisional"}
+    assert {e["evidence_tier"] for e in _tracked("EXPERIMENTS.tsv")} <= {"SMOKE", "DEVELOPMENT"}
+    assert all(e["prototype"] == "true" for e in _tracked("EXPERIMENTS.tsv"))
+
+
 # -------------------------------------------------------------------------- the fence
 
 
@@ -206,3 +265,30 @@ def test_the_throwaway_reference_is_not_imported_by_the_real_path():
         text = path.read_text(encoding="utf-8")
         assert "_score_split" not in text, f"{path.name} references the throwaway scorer"
         assert "_equal_donor_mean_sse" not in text, f"{path.name} references the throwaway aggregator"
+
+
+# ------------------------------------------------------------------- the pooling guard
+
+
+def test_pooling_across_folds_is_refused():
+    """Measured at SMOKE: Jaccard(G_0, G_1) = 0.639, so the folds are not on a common
+    axis and averaging them describes no measurement. The schema cannot express that;
+    preprocessing_hash can, and this is what uses it."""
+    from cnmfbench.analysis import PoolingError, assert_poolable, pooling_groups
+
+    rows, experiments = _tracked("RESULTS.tsv"), _tracked("EXPERIMENTS.tsv")
+    if not rows:
+        pytest.skip("no rows written yet")
+    groups = pooling_groups(rows, experiments)
+    assert len(groups) > 1, "expected per-fold preprocessing_hash values to differ"
+    with pytest.raises(PoolingError, match="common axis"):
+        assert_poolable(rows, experiments)
+    # Within one group it must succeed — the guard must not block valid aggregation.
+    assert assert_poolable(next(iter(groups.values())), experiments)
+
+
+def test_pooling_guard_refuses_rows_with_no_provenance():
+    from cnmfbench.analysis import PoolingError, assert_poolable
+
+    with pytest.raises(PoolingError, match="absent from EXPERIMENTS"):
+        assert_poolable([{"experiment_id": "ghost"}], [])

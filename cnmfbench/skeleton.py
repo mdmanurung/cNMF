@@ -72,7 +72,47 @@ def _repo_root():
 def _peak_mb():
     # ru_maxrss is a process LIFETIME high-water mark, so successive rows are monotone
     # non-decreasing. memory_scope says so rather than implying a per-experiment peak.
+    # A genuine per-experiment peak needs subprocess isolation, which is P0-07's job;
+    # faking one here would be worse than reporting this honestly.
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+
+
+MEMORY_SCOPE = "parent_process_peak_rss_lifetime"
+
+
+def _cost(wall, cpu, peak, failed_fits):
+    """One cost measurement, rendered once and written to **both** files.
+
+    The first version of this runner timed RESULTS and EXPERIMENTS separately and they
+    disagreed by a factor of ~2.2 for the same `experiment_id`: RESULTS carried only the
+    marginal `consensus` + scoring time while EXPERIMENTS added an amortised share of the
+    shared fit. The cost column a comparison actually reads therefore made factorization
+    free — which `IMPLEMENTATION_PROMPT.md:150` forbids, and which would have understated
+    feature A, since A adds inner-fold fits.
+
+    Returning a single mapping makes agreement structural rather than a matter of keeping
+    two call sites in step.
+    """
+    return {
+        "wall_seconds_v1": float(wall),
+        "cpu_seconds_v1": float(cpu),
+        "peak_memory_mb_v1": float(peak),
+        "failed_fits_v1": int(failed_fits),
+    }
+
+
+def _cost_result_rows(cost, common, exp_id):
+    """The four §5.2 cost metrics as RESULTS rows. `failed_fits_v1` is always emitted,
+    including as 0, per §5.2."""
+    return [
+        result_row(
+            **common, independent_unit_id=exp_id, independent_unit_type="experiment",
+            metric=metric,
+            value=int(value) if metric == "failed_fits_v1" else repr(value),
+            evaluation_scope="experiment", n_eligible_units=1, n_failed_units=0,
+        )
+        for metric, value in cost.items()
+    ]
 
 
 def check_preconditions(cfg, ablation):
@@ -97,8 +137,21 @@ def check_preconditions(cfg, ablation):
             "on the algorithm being unmodified."
         )
 
-    if cfg["evidence_tier"] != "SMOKE" or cfg.get("allow_scientific_promotion") is not False:
-        raise ContractViolation("this runner only writes SMOKE rows that cannot promote a feature")
+    # SMOKE checks the code runs; DEVELOPMENT is the only tier PROTOCOL §6.4 permits to
+    # inform design, and calibrating on it is exactly its purpose. SEALED_CONFIRMATION is
+    # refused here as well as by `scenarios.seed_for`, because a runner that could reach
+    # it by configuration would make the seal a convention rather than a mechanism.
+    if cfg["evidence_tier"] not in ("SMOKE", "DEVELOPMENT"):
+        raise ContractViolation(
+            f"evidence_tier {cfg['evidence_tier']!r} is not runnable here. The sealed tier "
+            "is evaluated only after the configuration is frozen (§6.4), and using it to "
+            "redesign the method consumes the set and requires generating a fresh one."
+        )
+    if cfg.get("allow_scientific_promotion") is not False:
+        raise ContractViolation(
+            "allow_scientific_promotion must be false: neither tier this runner writes "
+            "may promote a feature"
+        )
     if ablation["scientific_gates"]["smoke_can_promote_feature"] is not False:
         raise ContractViolation("smoke_can_promote_feature must be false")
     if any(cfg["features"].values()):
@@ -267,7 +320,7 @@ def _failed_experiment_row(fold, dataset_id, ds, cfg, fold_dir, prov, exc):
         candidate_rank="", selected_rank=None, artifact_dir=os.path.relpath(fold_dir, _repo_root()),
         command=" ".join(sys.argv), started_utc=now, finished_utc=now, exit_code=1,
         wall_seconds=NOT_COMPUTED, cpu_seconds=NOT_COMPUTED, peak_memory_mb=NOT_COMPUTED,
-        memory_scope="parent_process_peak_rss_lifetime",
+        memory_scope=MEMORY_SCOPE,
         failure_reason=f"{type(exc).__name__}: {exc}".replace("\t", " ").replace("\n", " ")[:400],
         notes=f"provisional={','.join(touched())}",
         discovery_cells_hash=NOT_COMPUTED, factor_bank_hash=NOT_COMPUTED,
@@ -354,6 +407,43 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
                                      norm, x_test, inf_pos, val_pos, test_rows[keep])]
     results, experiments = [], []
 
+    # ---- fit-scope rows: the shared prepare/factorize/combine cost, attributed once ----
+    #
+    # One `prepare` per fold serves every candidate rank — deliberately, because that is
+    # what makes §4.1's "panels identical across all candidate ranks" true by
+    # construction. Its cost therefore belongs to no single rank. Giving it its own row
+    # with `candidate_rank` empty lets the total be recovered by summing, with no double
+    # counting and no invented amortisation. The schema already allows this.
+    fit_id = make_experiment_id(CONFIGURATION, ARM_ID, dataset_id, fold.outer_split_id,
+                                None, {"seed": cfg["seed"]})
+    fit_cost = _cost(fit_wall, fit_cpu, _peak_mb(), 0)
+    fit_common = dict(experiment_id=fit_id, configuration=CONFIGURATION, arm=ARM_ID,
+                      dataset_id=dataset_id, outer_split_id=fold.outer_split_id,
+                      candidate_rank="", status="ok_provisional",
+                      artifact_path=os.path.relpath(fold_dir, root))
+    results.extend(_cost_result_rows(fit_cost, fit_common, fit_id))
+    experiments.append(experiment_row(
+        experiment_id=fit_id, prototype="true", feature_A="false", feature_B="false",
+        feature_C="false", arm=ARM_ID, status="completed",
+        evidence_tier=cfg["evidence_tier"], dataset_id=dataset_id,
+        dataset_manifest_hash=ds.dataset_manifest_hash, simulation_replicate=0,
+        outer_split_id=fold.outer_split_id, inner_split_id="", mask_id=panel.mask_id,
+        sampling_replicate=0, optimizer_seed=cfg["seed"], candidate_rank="",
+        selected_rank=None, discovery_cells_hash=discovery_hash,
+        # Rank-specific; a fit row covering every rank has no single factor bank.
+        factor_bank_hash=NOT_COMPUTED, preprocessing_hash=pre_hash,
+        artifact_dir=os.path.relpath(fold_dir, root), command=" ".join(sys.argv),
+        started_utc=started, finished_utc=_utc(), exit_code=0,
+        wall_seconds=repr(fit_cost["wall_seconds_v1"]),
+        cpu_seconds=repr(fit_cost["cpu_seconds_v1"]),
+        peak_memory_mb=repr(fit_cost["peak_memory_mb_v1"]),
+        memory_scope=MEMORY_SCOPE, failure_reason="",
+        notes=(f"provisional={','.join(touched())}; arm=full_training_pool_no_cell_budget; "
+               f"shared prepare/factorize/combine for ranks {ranks}; per-rank rows carry "
+               "marginal consensus+scoring cost only"),
+        **prov,
+    ))
+
     for k in ranks:
         t1, c1 = time.perf_counter(), time.process_time()
         obj.consensus(k=k, density_threshold=density_threshold,
@@ -399,13 +489,9 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
                 n_eligible_units=agg.n_eligible_donors, n_failed_units=agg.n_failed_donors,
             ))
 
-        for metric, val in (("wall_seconds_v1", wall), ("cpu_seconds_v1", cpu),
-                            ("peak_memory_mb_v1", _peak_mb()), ("failed_fits_v1", 0)):
-            results.append(result_row(
-                **common, independent_unit_id=exp_id, independent_unit_type="experiment",
-                metric=metric, value=repr(float(val)) if metric != "failed_fits_v1" else 0,
-                evaluation_scope="experiment", n_eligible_units=1, n_failed_units=0,
-            ))
+        # Marginal cost only — the shared fit is on its own row above.
+        rank_cost = _cost(wall, cpu, _peak_mb(), 0)
+        results.extend(_cost_result_rows(rank_cost, common, exp_id))
 
         experiments.append(experiment_row(
             experiment_id=exp_id, prototype="true", feature_A="false", feature_B="false",
@@ -419,13 +505,15 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
             preprocessing_hash=pre_hash,
             artifact_dir=os.path.relpath(fold_dir, root), command=" ".join(sys.argv),
             started_utc=started, finished_utc=_utc(), exit_code=0,
-            wall_seconds=repr(wall + fit_wall / len(ranks)),
-            cpu_seconds=repr(cpu + fit_cpu / len(ranks)),
-            peak_memory_mb=repr(_peak_mb()),
-            memory_scope="parent_process_peak_rss_lifetime", failure_reason="",
+            # Same object the RESULTS cost rows were rendered from, so the two files
+            # cannot disagree. A test asserts it per experiment_id.
+            wall_seconds=repr(rank_cost["wall_seconds_v1"]),
+            cpu_seconds=repr(rank_cost["cpu_seconds_v1"]),
+            peak_memory_mb=repr(rank_cost["peak_memory_mb_v1"]),
+            memory_scope=MEMORY_SCOPE, failure_reason="",
             notes=(f"provisional={','.join(touched())}; arm=full_training_pool_no_cell_budget; "
-                   f"density_threshold={density_threshold}; fit cost shared across "
-                   f"{len(ranks)} ranks from one prepare/factorize/combine"),
+                   f"density_threshold={density_threshold}; marginal consensus+scoring "
+                   f"cost only — the shared fit is on the {fold.outer_split_id} fit row"),
             **prov,
         ))
 
