@@ -362,7 +362,7 @@ alternatives.
 B003, B004 unchanged. No new blocker. Two things to carry forward instead:
 
 - **Donor count and per-donor depth are not separable at the 24-donor DEVELOPMENT tier.** If that separation matters for interpreting feature A's result, the tier needs more donors — a P1 decision with a compute cost, not something to resolve by reanalysis
-- **Feature A's hypothesis text must be restated before P1** to say "measures generalisation to unseen donors, which random-cell CV overestimates" rather than anything about per-donor leakage. Writing it the old way would be claiming a mechanism this session measured and did not find
+- ~~**Feature A's hypothesis text must be restated before P1**~~ → **DONE**, `docs/planning/FEATURE_CONTRACT_A.md`. States "measures generalisation to unseen donors, which random-cell CV overestimates" and records the three-arm measurement (leakage at fixed donor count t = −0.37; donor count t = +4.30) so the discarded framing cannot return. Adds the concrete mechanism found in the DEVELOPMENT run: one identity program with a **single** training carrier donor in `outer_0`, which no random-cell split can ever place out of sample. Endpoints exist; every margin remains NOT_SET
 
 #### Next task
 
@@ -418,7 +418,7 @@ Several were measured against the real data and changed decisions rather than wo
 
 #### Blockers still open
 
-B003, B004 unchanged. Carried forward: `delta` and the precision/recall threshold stay null; feature A's hypothesis text must be restated before P1 to say "measures generalisation to unseen donors, which random-cell CV overestimates", never anything about per-donor leakage.
+B003, B004 unchanged. Carried forward: `delta`, the precision/recall threshold and the `ambiguous` threshold stay null, to be batched into one v1.1 amendment. Feature A's hypothesis restatement is **closed** (`FEATURE_CONTRACT_A.md`).
 
 #### Next task
 
