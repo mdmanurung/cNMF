@@ -150,3 +150,36 @@ def _fold_mean(rows, outer_split_id, k):
                 and r["outer_split_id"] == outer_split_id and r["candidate_rank"] == str(k)):
             return float(r["value"])
     raise ValueError(f"no equal_donor_mean row for {outer_split_id} at k={k}")
+
+
+def verdict_for_run(run_dir):
+    """Evaluate a completed run's own shards. `K_true` comes from the dataset manifest and
+    `K_max` from the grid that was actually run, so neither is chosen by the caller."""
+    import json
+    import os
+
+    rows = load_rows(os.path.join(run_dir, "results.tsv"))
+    with open(os.path.join(run_dir, "diagnostics.json"), encoding="utf-8") as fh:
+        diagnostics = json.load(fh)
+    with open(os.path.join(run_dir, "dataset", "manifest.json"), encoding="utf-8") as fh:
+        params = json.load(fh)["parameters"]
+    k_true = params["n_identity"] + params["n_activity"]
+    k_max = max(int(r["candidate_rank"]) for r in rows if r["candidate_rank"])
+    return feasibility_verdict(rows, diagnostics, k_true, k_max)
+
+
+def main():
+    import argparse
+    import json
+
+    ap = argparse.ArgumentParser(description="Evaluate the pre-registered feasibility criteria.")
+    ap.add_argument("run_dir")
+    args = ap.parse_args()
+    print(json.dumps(verdict_for_run(args.run_dir), indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+
+    sys.exit(main())
