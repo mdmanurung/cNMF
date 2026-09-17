@@ -102,9 +102,14 @@ def feasibility_verdict(rows, diagnostics, k_true, k_max):
     # DIFFERENCE even though their levels are not. Donors are the independent unit (§3.5).
     shared = sorted(set(per_donor[k_true]) & set(per_donor[k_max]))
     diffs = np.array([per_donor[k_max][d] - per_donor[k_true][d] for d in shared])
-    se = float(diffs.std(ddof=1) / np.sqrt(len(diffs))) if len(diffs) > 1 else float("nan")
+    if len(diffs) < 2:
+        raise ValueError(f"need at least 2 paired donors, got {len(diffs)}")
+    se = float(diffs.std(ddof=1) / np.sqrt(len(diffs)))
     mean_diff = float(diffs.mean())
-    c1 = bool(mean_diff > 3 * se) if se and se > 0 else False
+    # A zero-variance difference is the STRONGEST evidence of curve structure, not the
+    # absence of it: every donor moved by the same amount. Treating se == 0 as a failure
+    # (an earlier version did) inverts the criterion exactly where it is most decisive.
+    c1 = bool(mean_diff > 0) if se == 0 else bool(mean_diff > 3 * se)
 
     # Criteria 2 and 3 are per fold; a single failing fold fails the run.
     folds = []
@@ -130,7 +135,7 @@ def feasibility_verdict(rows, diagnostics, k_true, k_max):
     return {
         "k_true": k_true, "k_max": k_max, "n_paired_donors": len(shared),
         "mean_paired_difference": mean_diff, "paired_se": se,
-        "paired_t": mean_diff / se if se and se > 0 else float("nan"),
+        "paired_t": (mean_diff / se) if se > 0 else float("inf" if mean_diff > 0 else "nan"),
         "criterion_1_curve_structure": c1,
         "criterion_2_not_flat_by_arithmetic": c2,
         "criterion_3_silhouette_not_degenerate": c3,
