@@ -1,0 +1,85 @@
+# CONVERGENCE DIAGNOSTIC. Identical to development.yaml except max_optimizer_iterations,
+# 300 -> 1000 (upstream's default). Permitted by the pre-registration's amendment, which was
+# committed at 3ed5bae while the first run was in flight and its verdict unknown.
+#
+# THE QUESTION THIS ASKS IS CRITERION 1, NOT CRITERION 2. Better convergence lowers observed
+# error, which moves ratios TOWARD the floor and so can only make criterion 2's failure
+# firmer -- it cannot rescue it. The real exposure is criterion 1: at max_iter=300 a K=10 fit
+# has more parameters to move than a K=7 fit and is therefore further from convergence, which
+# inflates error(K=10) relative to error(K=7) and could manufacture part of the observed
+# 1.673 rise. That rise, at t = 26.8, is the sole evidence that the curve has structure at
+# all. If it shrinks substantially here, the NO-GO becomes better supported, not worse.
+#
+# Predicted direction is therefore AGAINST the outcome that would be convenient. Recording
+# that prediction before the run so the result cannot be read as fishing.
+#
+# DEVELOPMENT tier. PROTOCOL.md section 6.4 names this "the only tier that may" inform
+# design -- calibration, pilot variability and constant-setting happen here and nowhere
+# else. It still cannot promote a feature: allow_scientific_promotion is false.
+schema_version: 1
+profile: development
+evidence_tier: DEVELOPMENT
+allow_scientific_promotion: false
+
+# Split and optimizer seed. The SIMULATION seed is not this value -- it comes from
+# scenarios.seed_for("DEVELOPMENT"), so that regenerating data and re-splitting it are
+# separate acts. The panel seed is separate again (see validation.panel_seed).
+seed: 90210
+scenario: base_identifiable
+
+# Must match cnmfbench.scenarios' DEVELOPMENT tier exactly; the runner asserts it and
+# refuses to run on divergence rather than silently preferring one source.
+simulation:
+  donors: 24
+  cells_per_donor: 200
+  genes: 2000
+  true_programs: 7
+  observation_model: poisson
+  independent_replicates: 1
+
+factorization:
+  backend: pinned_upstream_cnmf
+  loss: frobenius
+  # Spans both sides of K_true = 7. FROZEN BEFORE THE RUN and not expandable afterwards:
+  # PROTOCOL section 1.4 forbids grid expansion after seeing outcomes outright, and
+  # expansion justified by inner-development evidence creates a new protocol version.
+  candidate_ranks: [4, 5, 6, 7, 8, 9, 10]
+  # 10, not smoke's 5. n_neighbors = int(0.30 * n_iter) = 3 here rather than 1, which
+  # makes the consensus local-density estimate less degenerate -- and the silhouette
+  # curve is one of the three things this tier is being run to measure.
+  optimizer_starts: 10
+  max_optimizer_iterations: 1000
+  # 1200, NOT 2000. cNMF takes the top-N genes by Fano ratio, so N >= n_genes returns
+  # every gene and HVG selection becomes a silent no-op: G would be identical across
+  # folds and hvg_retention trivially 1.0, killing one of the three checks. Setting it
+  # below the gene count keeps G training-fitted and fold-specific as section 3.2
+  # requires. Consequence, accepted deliberately: the folds are NOT poolable, exactly as
+  # at smoke -- use cnmfbench.analysis.assert_poolable before aggregating anything.
+  num_highvar_genes: 1200
+  # Enters the consensus artifact filename via str(x).replace('.','_') -> 'dt_2_0'.
+  density_threshold: 2.0
+
+validation:
+  outer_donor_folds: 2
+  inner_donor_folds: 2
+  inference_gene_fraction: 0.5
+  # Independent of `seed` above and of the optimizer seed, per PROTOCOL section 4.1, so
+  # that panel variation and optimisation variation can be told apart.
+  panel_seed: 20260918
+  panel_repetitions: 1
+  projection: nonnegative_least_squares_frozen_dictionary
+  transform: training_fitted_and_leakage_audited
+
+resources:
+  cores: 2
+  blas_threads_per_job: 1
+  memory_limit_mb: 8192
+
+features:
+  A: false
+  B: false
+  C: false
+
+source_pins:
+  cnmf_full_commit_sha: 5dbc5baaa0b9079b55bce554d801caa235a50457
+  genenmf_full_commit_sha: null
