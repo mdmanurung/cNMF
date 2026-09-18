@@ -106,3 +106,87 @@ Megakaryocytes	8	1	132
 ## software_status	PASS	(both files downloaded, hashed and characterised)
 ## scientific_adoption	NOT_EVALUATED	(no benchmark run has used either)
 ## evidence_tier	NONE	(characterisation only; nothing measured against cNMF yet)
+##
+## ============================================================================
+## HEART CELL ATLAS v2 -- fetched 2026-09-18, at the user's request
+## ============================================================================
+##
+dataset	source_url	sha256	bytes	cells	genes
+heart_cell_atlas_v2_global_raw	https://cellgeni.cog.sanger.ac.uk/heartcellatlas/v2/Global_raw.h5ad	2280a34361a67ac6b24a787ddc037d0f7f78d7db91f5dcfb8ee822d7e80c7ed2	9125578296	704296	32732
+##
+## Byte count verified against the server's content-length before hashing.
+## Companion files on the same host, not fetched: v2 Global_lognormalised.h5ad (8.73 GB),
+## v1/Litvinukova global_raw.h5ad (5.07 GB, 486K cells), v1 ventricular CM raw (1.69 GB).
+##
+## LICENSE: CC BY 4.0 with an attribution requirement (Human Cell Atlas data use terms,
+## data.humancellatlas.org/about/data-use-agreement). This is the FIRST of the three
+## candidates whose license has actually been read. Kang's remains unverified.
+## Citation: "Spatially resolved multiomics of human cardiac niches", Nature, 12 July 2023.
+##
+## ---- RAW COUNTS: CONFIRMED ----
+## .X min 1.0, max 2213.0, integer-valued. 0 duplicate gene names in 32,732.
+## Unlike the Stephenson redistribution above, this file is what its name says.
+##
+## ---- 22 DONORS in the object ----
+## heartcellatlas.org describes the STUDY as 25 adult donors (14F/11M, ages 20-75). The
+## Global object carries 22. The discrepancy is recorded, not resolved -- do not quote 25.
+## cells/donor 5,757 - 75,191, median 29,765. All 12 cell types present in all 22 donors
+## except Mesothelial cell (19/22).
+##
+## ---- THE CONFOUND THAT DECIDES HOW THIS IS USED ----
+##
+## The object mixes WHOLE CELLS and NUCLEI: 135,698 'Cell' against 568,598 'Nuclei'.
+## Nuclei lack cytoplasmic and mitochondrial mRNA, so the two have systematically different
+## profiles. Running cNMF across the whole object would produce a leading program that is the
+## ASSAY rather than any biology, and it would look like a confident, well-supported factor.
+## The object must be sliced to one assay before use.
+##
+## Worse, ASSAY IS CONFOUNDED WITH DONOR -- the slices do not share their donor sets:
+##
+slice	cells	donors	cells_per_donor_min	cells_per_donor_max	kits	regions
+scRNA_whole_cells	135698	7	varies	57245	2	6
+snRNA_nuclei	357538	14	13844	45050	2	6
+Multiome-RNA	211060	10	varies	55785	1	8
+##
+## So the 22-donor figure is not available to any single coherent analysis. Choosing an assay
+## costs donors, which is the quantity D008 identified as dominant.
+##
+## ---- RECOMMENDED SLICE: snRNA nuclei, 357,538 cells, 14 donors ----
+## Best donor count of the three coherent slices, generous depth (median 17,425 cells/donor
+## after slicing), and 10 of 12 cell types present in all 14 donors.
+##
+cell_type	donors_present_of_14	min_cells_in_any_donor	total_cells
+Ventricular Cardiomyocyte	14	5313	141830
+Fibroblast	14	2262	71103
+Mural cell	14	1154	67158
+Atrial Cardiomyocyte	14	390	25576
+Endothelial cell	14	1082	24819
+Myeloid	14	386	11867
+Lymphoid	14	8	5574
+Adipocyte	14	49	3844
+Neural cell	14	72	3445
+Mast cell	13	2	1227
+Mesothelial cell	10	2	649
+Lymphatic Endothelial cell	14	3	446
+##
+## Lymphatic Endothelial (446), Mesothelial (649) and Mast (1227) are genuine rare
+## populations -- the real-data counterpart to the simulator's rare identity programs.
+##
+## ---- A NESTING THAT MUST BE STATED IN ANY FEATURE-A RESULT ----
+## Within the snRNA slice, 10x KIT IS FULLY NESTED IN DONOR: zero donors use more than one
+## kit (3prime-v3 190,497 cells; 3prime-v2 167,041). Donor-blocked CV therefore holds out
+## chemistry along with the donor, so a "generalises to an unseen donor" number here is
+## partly "generalises to an unseen chemistry". This is arguably the honest real-world
+## setting -- a new cohort usually arrives on whatever chemistry is current -- but it is NOT
+## the clean donor effect the simulator isolates, and a result quoted without this caveat
+## would overstate what was measured.
+##
+## ---- STANDING AGAINST THE OTHER CANDIDATES ----
+## donors:  Kang 8  <  heart snRNA 14  <  simulator DEVELOPMENT 24
+## Heart is the best real donor structure obtained so far and still below the tier the
+## simulator runs at. Kang keeps its distinct role: it is the only candidate with a KNOWN
+## ACTIVITY PROGRAM carrying a per-cell label, which heart does not have at all.
+##
+## software_status	PASS	(downloaded byte-exact, hashed, characterised)
+## scientific_adoption	NOT_EVALUATED	(no benchmark run has used it)
+## evidence_tier	NONE
