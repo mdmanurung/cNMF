@@ -241,8 +241,25 @@ def test_the_gate_is_blocked_while_components_are_provisional():
 
 
 def test_every_provisional_component_names_a_real_ledger_task():
+    """Checks the owner against the ACTUAL task ledger, not a hardcoded prefix.
+
+    The earlier version asserted `startswith("P0-")`, which was true only while the fence
+    held P0 components alone; it failed the moment features B and C added entries owned by
+    P2-01 and P3-01, both of which are real tasks. Reading the ledger is also strictly
+    stronger than the prefix check ever was, because it catches a typo'd or retired task id
+    — which is the failure that would actually orphan a fenced component.
+    """
+    import re
+
+    with open(os.path.join(REPO, "docs/planning/PROGRESS.md"), encoding="utf-8") as fh:
+        ledger = set(re.findall(r"^\|\s*((?:S0|P[0-9])-[0-9]+)\s*\|", fh.read(), re.M))
+    assert len(ledger) >= 20, f"failed to parse the task ledger, found {len(ledger)}"
     for c in P.PROVISIONAL.values():
-        assert c.owner_task.startswith("P0-")
+        assert c.owner_task in ledger, (
+            f"{c.component_id} is owned by {c.owner_task!r}, which is not a task in "
+            "PROGRESS.md. A fenced component whose owner does not exist can never be "
+            "hardened, because no task will ever come up that claims it."
+        )
         assert c.reason and c.hardening_requires
 
 
