@@ -391,11 +391,167 @@ def _failed_experiment_row(fold, dataset_id, ds, cfg, fold_dir, prov, exc):
     )
 
 
+def _consensus_dictionary(obj, k, g_list, cfg, density_threshold):
+    """`median_spectra` at rank `k`, with feature C applied if it is on.
+
+    Extracted from `_run_fold` so the inner validation loop builds its dictionary by the
+    SAME rule. If the inner loop had kept upstream consensus while the outer loop applied
+    C, feature A would select a rank for one algorithm and the outer evaluation would score
+    another — and the `101`/`111` cells would silently measure that mismatch rather than
+    the A×C interaction they are named for.
+
+    Returns `(v_arr, consensus_info)`; `v_arr` is K x |G| in the engine's scaled space.
+    """
+    from cnmf.cnmf import load_df_from_npz
+
+    obj.consensus(k=k, density_threshold=density_threshold,
+                  show_clustering=False, build_ref=False)
+    dt_repl = str(density_threshold).replace(".", "_")
+    v = load_df_from_npz(obj.paths["consensus_spectra"] % (k, dt_repl))
+    if list(v.columns) != g_list:
+        raise ContractViolation("consensus_spectra gene order differs from G")
+    v_arr = v.values.astype(np.float64)  # median_spectra: K x |G|, rows sum to 1
+    consensus_info = {}
+
+    if (cfg.get("features") or {}).get("C"):
+        # ---- feature C: one contribution per run per upstream cluster ----
+        #
+        # C reuses the IDENTICAL factor bank (the ablation plan's
+        # `reuse_identical_factor_banks_across_C`), so 000 vs 001 is an exactly paired
+        # comparison with no optimizer-randomness between the arms.
+        #
+        # Because `cnmf.py` may not be edited, the aggregation is reimplemented
+        # harness-side. That is only safe if the reimplementation reproduces upstream
+        # when the switch is off — otherwise the measured C effect is really the
+        # difference between upstream and this module. The check is run HERE, at run
+        # time on the actual bank, not only in the test suite, for the same reason
+        # `verify_transform_matches_cnmf` is: it guards a property of the data, not of
+        # the code path.
+        merged = load_df_from_npz(obj.paths["merged_spectra"] % k)
+        n_iter = cfg["factorization"]["optimizer_starts"]
+        v_off, _ = consensus_spectra_from_bank(merged, k, density_threshold, n_iter,
+                                               one_per_run=False)
+        ref_a = np.sort(v_arr, axis=0)
+        ref_b = np.sort(v_off.values.astype(np.float64), axis=0)
+        rel = float(np.linalg.norm(ref_a - ref_b) / np.linalg.norm(ref_a))
+        if rel > 1e-8:
+            raise ContractViolation(
+                f"feature C's OFF path diverges from upstream consensus by relative "
+                f"Frobenius {rel:.3e} at k={k}. The C effect would be confounded with "
+                "this divergence, so the run refuses rather than reporting it."
+            )
+        v_on, consensus_info = consensus_spectra_from_bank(
+            merged, k, density_threshold, n_iter, one_per_run=True)
+        if list(v_on.columns) != g_list:
+            raise ContractViolation("deduplicated spectra gene order differs from G")
+        v_arr = v_on.values.astype(np.float64)
+        consensus_info["off_path_rel_error_vs_upstream"] = rel
+
+    return v_arr, consensus_info
+
+
+def _run_inner_fold(inner, adata, raw, donors, gene_names, ranks, cfg, fold_dir,
+                    density_threshold):
+    """Fit on ONE inner fold's training donors; score its validation donors per rank.
+
+    **This is the table feature A selects on, and nothing else consumes it.** PROTOCOL §1.1
+    is explicit that the A-OFF baseline selector reads `silhouette` and `prediction_error`
+    from `k_selection_stats`, which `consensus(skip_density_and_return_after_stats=True)`
+    computes *on the training fit itself* — "both inputs already exist on disk after a rank
+    sweep; the selector computes nothing new" (`PROTOCOL.md:48`). The A-OFF baseline never
+    reads an inner validation fold. So the caller runs this loop only when A is on, and
+    `000`-vs-`100` keeps A's selection cost on A's side of the comparison, which
+    `IMPLEMENTATION_PROMPT.md` P0.3(4) requires and `skeleton.py:120-124` already records
+    as a way this programme has understated A before.
+
+    **`genes_file` is deliberately not passed.** The inner fit selects its own `G` from
+    inner-training cells only. Reusing the outer fold's `G` would be the leak this nesting
+    exists to prevent, one level down: the outer `G` is computed over all outer-training
+    donors, which *include* this fold's inner-validation donors, so rank selection would be
+    choosing K with preprocessing that had already seen the data it selects on. The same
+    argument applies to `s_g`, which is refitted here on inner-training rows.
+
+    The panel is drawn over the inner `G`, so it differs from the outer fold's panel. That
+    is not a §4.1 violation: §4.1 requires one panel across the candidate ranks *within a
+    comparison*, and the comparison this table feeds is across ranks inside this inner fold,
+    where one panel serves all of them.
+
+    Returns one dict per candidate rank. No rows are emitted here — the selector's output
+    (`selected_rank`) is what reaches the record; the inner scores are its working.
+    """
+    from cnmf import cNMF
+
+    is_inner_train = np.isin(donors, np.asarray(inner.train_donors))
+    is_inner_val = np.isin(donors, np.asarray(inner.validation_donors))
+    if not is_inner_train.any() or not is_inner_val.any():
+        raise ContractViolation(
+            f"{inner.inner_split_id} has {int(is_inner_train.sum())} training and "
+            f"{int(is_inner_val.sum())} validation cells. A fold with no cells on one side "
+            "cannot score a rank, and returning a null score would let the selector pick a "
+            "rank from folds that silently did not run."
+        )
+
+    # cNMF writes under `output_dir/name/`, so the inner fits land in their own
+    # directories and cannot overwrite the outer fold's `nmf_genes_list` or spectra. The
+    # leakage suite asserts that separation on the bytes rather than trusting the layout.
+    inner_dir = os.path.join(fold_dir, "inner")
+    os.makedirs(inner_dir, exist_ok=True)
+    train_path = os.path.join(inner_dir, f"{inner.inner_split_id}_counts.h5ad")
+    adata[is_inner_train].copy().write_h5ad(train_path)
+
+    obj = cNMF(output_dir=inner_dir, name=inner.inner_split_id)
+    obj.prepare(
+        counts_fn=train_path, components=list(ranks),
+        n_iter=cfg["factorization"]["optimizer_starts"],
+        num_highvar_genes=cfg["factorization"]["num_highvar_genes"],
+        seed=cfg["seed"], beta_loss=cfg["factorization"]["loss"],
+        max_NMF_iter=cfg["factorization"]["max_optimizer_iterations"],
+    )
+    obj.factorize(worker_i=0, total_workers=1)
+    obj.combine()
+
+    with open(obj.paths["nmf_genes_list"], encoding="utf-8") as fh:
+        g_list = fh.read().rstrip("\n").split("\n")
+    g_pos = np.array([gene_names.index(g) for g in g_list])
+    train_pos = np.flatnonzero(is_inner_train)
+    s_g = training_gene_scale(raw[np.ix_(train_pos, g_pos)])
+
+    panel = gene_panel(g_list, cfg["validation"]["inference_gene_fraction"],
+                       cfg["validation"]["panel_seed"])
+    inf_pos = np.array([g_list.index(g) for g in panel.inference_genes])
+    val_pos = np.array([g_list.index(g) for g in panel.validation_genes])
+
+    val_rows = np.flatnonzero(is_inner_val)
+    raw_val_g = raw[np.ix_(val_rows, g_pos)]
+    x_val = to_training_scale(raw_val_g, s_g)
+    keep = scoreable_mask(raw_val_g[:, inf_pos])
+    x_val, val_donors = x_val[keep], donors[val_rows][keep]
+
+    scores = []
+    for k in ranks:
+        v_arr, _ = _consensus_dictionary(obj, k, g_list, cfg, density_threshold)
+        u = nnls_usages(x_val[:, inf_pos], v_arr[:, inf_pos])
+        # Count units, per D016: the selector must be comparable across arms, and the
+        # scaled space is not shared between B's arms because each refits its own `s_g`.
+        per_cell = count_unit_error(x_val[:, val_pos], u, v_arr[:, val_pos], s_g[val_pos])
+        agg = equal_donor_mean(per_cell, val_donors)
+        scores.append({
+            "inner_split_id": inner.inner_split_id,
+            "candidate_rank": int(k),
+            "heldout_squared_prediction_error_counts_v1": float(agg.value),
+            "n_eligible_donors": int(agg.n_eligible_donors),
+            "n_failed_donors": int(agg.n_failed_donors),
+            "n_scored_cells": int(x_val.shape[0]),
+            "mask_id": panel.mask_id,
+            "gene_panel_G": cell_set_hash(g_list),
+        })
+    return scores
+
+
 def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
               fold_dir, dataset_id, prov, density_threshold):
     """One outer fold: fit on training donors only, then score every candidate rank."""
     from cnmf import cNMF
-    from cnmf.cnmf import load_df_from_npz
 
     root = _repo_root()
     os.makedirs(fold_dir, exist_ok=True)
@@ -563,48 +719,8 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
 
     for k in ranks:
         t1, c1 = time.perf_counter(), time.process_time()
-        obj.consensus(k=k, density_threshold=density_threshold,
-                      show_clustering=False, build_ref=False)
         dt_repl = str(density_threshold).replace(".", "_")
-        v = load_df_from_npz(obj.paths["consensus_spectra"] % (k, dt_repl))
-        if list(v.columns) != g_list:
-            raise ContractViolation("consensus_spectra gene order differs from G")
-        v_arr = v.values.astype(np.float64)  # median_spectra: K x |G|, rows sum to 1
-        consensus_info = {}
-
-        if (cfg.get("features") or {}).get("C"):
-            # ---- feature C: one contribution per run per upstream cluster ----
-            #
-            # C reuses the IDENTICAL factor bank (the ablation plan's
-            # `reuse_identical_factor_banks_across_C`), so 000 vs 001 is an exactly paired
-            # comparison with no optimizer-randomness between the arms.
-            #
-            # Because `cnmf.py` may not be edited, the aggregation is reimplemented
-            # harness-side. That is only safe if the reimplementation reproduces upstream
-            # when the switch is off — otherwise the measured C effect is really the
-            # difference between upstream and this module. The check is run HERE, at run
-            # time on the actual bank, not only in the test suite, for the same reason
-            # `verify_transform_matches_cnmf` is: it guards a property of the data, not of
-            # the code path.
-            merged = load_df_from_npz(obj.paths["merged_spectra"] % k)
-            n_iter = cfg["factorization"]["optimizer_starts"]
-            v_off, _ = consensus_spectra_from_bank(merged, k, density_threshold, n_iter,
-                                                   one_per_run=False)
-            ref_a = np.sort(v_arr, axis=0)
-            ref_b = np.sort(v_off.values.astype(np.float64), axis=0)
-            rel = float(np.linalg.norm(ref_a - ref_b) / np.linalg.norm(ref_a))
-            if rel > 1e-8:
-                raise ContractViolation(
-                    f"feature C's OFF path diverges from upstream consensus by relative "
-                    f"Frobenius {rel:.3e} at k={k}. The C effect would be confounded with "
-                    "this divergence, so the run refuses rather than reporting it."
-                )
-            v_on, consensus_info = consensus_spectra_from_bank(
-                merged, k, density_threshold, n_iter, one_per_run=True)
-            if list(v_on.columns) != g_list:
-                raise ContractViolation("deduplicated spectra gene order differs from G")
-            v_arr = v_on.values.astype(np.float64)
-            consensus_info["off_path_rel_error_vs_upstream"] = rel
+        v_arr, consensus_info = _consensus_dictionary(obj, k, g_list, cfg, density_threshold)
 
         u = nnls_usages(x_test[:, inf_pos], v_arr[:, inf_pos])
         loss_train_scale = squared_prediction_error(x_test[:, val_pos], u, v_arr[:, val_pos])

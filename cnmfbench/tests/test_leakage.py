@@ -409,9 +409,16 @@ def test_perturbing_outer_test_values_DOES_change_the_score(audit):
 
     clean, dirty = losses(audit["clean_dir"]), losses(audit["dirty_dir"])
     assert clean and set(clean) == set(dirty)
-    moved = [k for k in clean if clean[k] != dirty[k]]
+
+    # Scoped to the audited fold, and for the same reason the stability-curve test is:
+    # `outer_1`'s losses move because the perturbed donors are its TRAINING donors. If
+    # `moved` were collected across both folds, `outer_1` would mask an invariant
+    # `outer_0` — which is the exact failure this control exists to catch.
+    audited = [k for k in clean if k[0] == AUDITED_FOLD]
+    assert audited, f"no {AUDITED_FOLD} loss rows; the control cannot run"
+    moved = [k for k in audited if clean[k] != dirty[k]]
     assert moved, (
-        "held-out scores are identical after perturbing held-out counts. Either the "
-        "perturbation never reached scoring, or the evaluator ignores held-out data — "
-        "and in either case every invariance in this file is vacuous."
+        f"{AUDITED_FOLD}'s held-out scores are identical after perturbing its held-out "
+        "counts. Either the perturbation never reached scoring, or the evaluator ignores "
+        "held-out data — and in either case every invariance in this file is vacuous."
     )
