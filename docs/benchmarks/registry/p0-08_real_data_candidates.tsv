@@ -190,3 +190,59 @@ Lymphatic Endothelial cell	14	3	446
 ## software_status	PASS	(downloaded byte-exact, hashed, characterised)
 ## scientific_adoption	NOT_EVALUATED	(no benchmark run has used it)
 ## evidence_tier	NONE
+##
+## ============================================================================
+## CELLXGENE DISCOVER -- a SYSTEMATIC source of raw counts, not a single dataset
+## ============================================================================
+##
+## Queried api.cellxgene.cziscience.com/curation/v1/datasets on 2026-09-18: 2,228 datasets.
+##
+## WHY THIS SOURCE IS DIFFERENT: the CZI schema MANDATES both of the things every candidate
+## above had to be checked for by hand. Quoting schema 7.0.0:
+##
+##   raw counts: "Values MUST be de-duplicated molecule counts. Each cell MUST contain at
+##   least one non-zero value. All non-zero values MUST be positive integers stored as
+##   numpy.float32." ... "MUST be stored in AnnData.raw.X unless no normalized matrix
+##   exists, in which case they go in AnnData.X."
+##
+##   donor_id: "MUST NOT be 'na', but MUST be free-text that identifies a unique individual
+##   that data were derived from" (except for cell lines).
+##
+## So raw counts and donor identity are STRUCTURAL GUARANTEES here, not properties to hope
+## for. Every dataset also carries an explicit license and DOI.
+##
+## ---- A GOTCHA THAT INVERTS THE EARLIER CHECK ----
+## On CellxGene, `.X` IS NORMALISED and the raw counts live in `.raw.X`. The integrality test
+## that correctly rejected the Stephenson redistribution above would therefore return a FALSE
+## NEGATIVE on a perfectly good CellxGene dataset. For this source, test `.raw.X` first and
+## fall back to `.X` only when `.raw` is None.
+##
+## ---- DO NOT USE x_approximate_distribution AS THE COUNTS INDICATOR ----
+## It is populated for only 76 of 2,228 datasets (40 COUNT, 36 NORMAL, 2,152 null). All three
+## candidates below report null. The schema guarantee is the reliable fact; this field is not.
+##
+## ---- HIGHEST-DONOR HUMAN BLOOD/PBMC DATASETS AVAILABLE ----
+##
+dataset	donors	cells	h5ad_GB	doi	url
+OneK1K_Yazar_2022	981	1248980	4.43	10.1126/science.abf3041	https://datasets.cellxgene.cziscience.com/1e44db10-b572-46cc-adae-dcc7acd44ca6.h5ad
+AIDA_Phase1_v2	625	1265624	14.24	10.1016/j.cell.2025.02.017	https://datasets.cellxgene.cziscience.com/f89a12c2-7a3b-415b-ab87-bbc550fe17f4.h5ad
+Perez_2022_lupus_PBMC	261	1263676	12.22	10.1126/science.abf1970	https://datasets.cellxgene.cziscience.com/c55dc602-d168-4d15-acc1-5de4f2f5d551.h5ad
+##
+## OneK1K is the standout: the MOST donors of anything found (981) and the SMALLEST file of
+## the three (4.43 GB, a third of the others despite the same ~1.25M cells). Not downloaded --
+## no benchmark need has been established for it yet.
+##
+## Other high-donor human tissue seen in the same index, for the record: MSSM dorsolateral
+## prefrontal cortex (1,042 donors, 4.1M cells), human lung atlas (484), colorectal cancer
+## atlas (588), IBDverse (422).
+##
+## ---- REVISED DONOR STANDING ACROSS EVERYTHING ASSESSED ----
+## Kang 8  <  heart snRNA 14  <  simulator DEVELOPMENT 24  <<  Perez 261  <  OneK1K 981
+## The simulator is no longer the highest-donor option available. Whether 981 donors is
+## USEFUL is a separate question from whether it is obtainable -- at that scale the binding
+## constraint becomes compute, and D008's finding that donor count dominates means a result
+## at n=981 answers a different question from one at n=24.
+##
+## software_status	PASS	(index queried; schema requirement read and quoted)
+## scientific_adoption	NOT_EVALUATED
+## evidence_tier	NONE
