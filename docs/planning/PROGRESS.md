@@ -2,17 +2,17 @@
 
 **Specification prepared:** 15 September 2026  
 **Target repository:** `dylkot/cNMF`  
-**Current state:** IN_PROGRESS — S0 closed, protocol frozen at v1.0.1, simulator built and measured, the benchmark loop closes end to end, and the DEVELOPMENT tier has been run under a pre-registered feasibility gate: `RESULTS.tsv` holds 1342 rows and `EXPERIMENTS.tsv` 40, across `SMOKE` and two `DEVELOPMENT` runs  
+**Current state:** IN_PROGRESS — S0 closed, protocol frozen at v1.0.1, simulator built and measured, the benchmark loop closes end to end, and the DEVELOPMENT tier has been run under a pre-registered feasibility gate: `RESULTS.tsv` holds 1342 rows and `EXPERIMENTS.tsv` 40, across `SMOKE` and two `DEVELOPMENT` runs. **P0-05 is now DONE** (nested donor folds, the §3.2 leakage audit, panel repetitions, the §4.1 cross-arm panel audit — all tested against real cNMF fits); the fence is down to four components; **P0-06 (the selector and `delta`) is next.** No new rows entered `RESULTS.tsv`/`EXPERIMENTS.tsv` this session — verification runs were compared against tracked rows and discarded  
 **Important:** No target-package code has been modified. The first rows exist but **establish execution, not scientific benefit** — `smoke_can_promote_feature: false` and `allow_scientific_promotion: false` make them unusable for any adoption decision, and every row carries `status: ok_provisional` because throwaway components produced it.
 
 ## 1. Session dashboard
 
 | Field | Current value |
 |---|---|
-| Active prototype | P0 — loop closes at SMOKE and DEVELOPMENT; P0-04 metrics **wired into the runner**; features B and C switchable and exercised at both tiers; next is P0-05 |
+| Active prototype | P0 — loop closes at SMOKE and DEVELOPMENT; P0-04 metrics **wired into the runner**; features B and C switchable and exercised at both tiers; nested donor folds and the §3.2 leakage audit implemented and tested against real fits (P0-05); next is P0-06 |
 | Active task | None |
-| Next task | **P0-05** — the leakage suite. P0-04 is complete: metrics, corruption battery, D004's obligations, and the runner wiring that writes `program_recovery_cosine_v1` / `usage_error_v1` rows |
-| Implementing agent/session | Claude Code session, 2026-09-15 |
+| Next task | **P0-06** — the selector and `delta`. P0-05 is complete: nested folds, leakage audit, panel repetitions, the §4.1 cross-arm panel audit. See §10 below for the mechanical calibration procedure and two known traps |
+| Implementing agent/session | Claude Code session, 2026-09-18 (P0-05) |
 | Local checkout | `/exports/para-lipg-hpc/mdmanurung/cNMF`, branch `main` |
 | Environment | conda env `cnmf_bench` (Python 3.10.20, cnmf 1.7.1 editable from this checkout, BLAS scipy-openblas 0.3.29). Activate: `module load tools/miniconda/python3.10/23.3.1 && source activate cnmf_bench` |
 | Pinned upstream SHA | `5dbc5baaa0b9079b55bce554d801caa235a50457` (resolved via `git ls-remote https://github.com/dylkot/cNMF HEAD`; identical to local HEAD — see DECISIONS.md D002) |
@@ -456,6 +456,10 @@ P0-05 is **DONE**. Nested donor folds, the §3.2 leakage audit, panel repetition
 - **The inner-budget-under-`matched_budget` sampling design is deferred and fully specified at D020**, not implemented. Before any A-ON `matched_budget` configuration (`100/101/110/111`) can run, D020's eight sub-problems need resolving — most load-bearing: `make_experiment_id` has no `inner_split_id` slot, so two inner folds of one outer fold at one rank collide on `experiment_id` today, and that collision must be resolved before any inner row can be written, independent of the sampling arithmetic.
 
 `delta` is one of seven items batched into the single protocol v1.1 amendment (approved plan §7 lists all seven) — do not version PROTOCOL twice.
+
+**The seed-dispersion runs do not exist yet — this is new work, not a read of existing data.** Every DEVELOPMENT run so far (`p04-dev-*`, `p0-03-dev-*`) used a single `cfg["seed"]`. Step 3 of the calibration procedure needs *several* DEVELOPMENT runs on `base_identifiable` and `A_weak` that vary only `cfg["seed"]`, so their silhouette curves can be compared to get the within-scenario dispersion. `variant` (D014) is not needed for this — `seed` already enters `experiment_id`'s payload (`skeleton.py:723`), so runs are distinguishable without it; a fresh `run_id` per seed is enough. `A_weak` and `A_null` are implemented (`scenarios.py:136-146`) but have never actually been run — confirm they execute at SMOKE before spending DEVELOPMENT time on them.
+
+Exact next command: `python -m pytest cnmfbench -q` to confirm 229 pass and exit 0, then read `PROTOCOL.md:125-179` (§2) in full before writing any selector code — the null-`delta` refusal must be checked *first*, before the §1.4 degenerate-curve branch, or a flat curve becomes a route to a selected rank while `delta` is still null.
 
 Then the P0 gate, then P1/A. The user's target is the first `000` vs `100` comparison. Plan: `/home/mdmanurung/.claude/plans/plan-the-next-steps-warm-tome.md`.
 
