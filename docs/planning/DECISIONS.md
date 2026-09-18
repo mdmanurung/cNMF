@@ -301,6 +301,21 @@ Consequences for the baseline and active feature set: none algorithmic; `src/cnm
 Protocol/data versions superseded: none.
 Independent confirmation needed: no.
 
+## D018 — Two dependency-order deviations are recorded after the fact, because the ledger was contradicting itself
+
+Date/time: 2026-09-18, P0-05 planning
+Type: deviation
+Related task, feature, gate: P0-02, P0-06, P0-08, gate P0
+Context: the ledger declares dependencies and two of them have been violated without an entry. **P0-06 is IN_PROGRESS while its declared dependency P0-05 is TODO** (`PROGRESS.md:68` vs `:67`) — its specification half was written at S0-03, long before P0-05 existed as a question. **P0-08 work proceeded while its declared dependency P0-02 is TODO** (`:70` vs `:64`) — four datasets were downloaded, hashed and assessed, and a diagnostic cNMF run was made on Kang. The P0-02/P0-03 inversion got D006; these two got nothing, so the ledger states dependencies it does not keep and a reader cannot tell deliberate sequencing from drift.
+Options considered: (a) record both deviations and leave the order as it is; (b) revert — un-start P0-06's specification and discard the P0-08 assessment; (c) rewrite the declared dependencies to match what happened.
+Decision: **(a).** Both deviations stand and are recorded here. Neither task is marked DONE, and P0-08's ledger row was deliberately **not** advanced despite five commits of work, because license verification is an explicit acceptance requirement and is satisfied for exactly one of the four datasets (Heart Cell Atlas, CC BY 4.0).
+Reason: (b) destroys work that is correct and useful for a bookkeeping reason. (c) is the dangerous option — editing a dependency to match what was already done makes the ledger unfalsifiable, and the dependency graph is one of the few things that can catch work being built on an absent foundation. Recording the deviation keeps the graph honest *and* the work. The two deviations are also different in kind and should not be read as one: P0-06's is **specification without implementation**, which is safe because a frozen spec constrains later code rather than depending on it; P0-08's is **assessment without acceptance**, which is safe because no row it produced entered the evidence system — the Kang run wrote no `RESULTS.tsv` or `EXPERIMENTS.tsv` rows at all and is labelled a diagnostic.
+Evidence paths and experiment IDs: `docs/planning/PROGRESS.md` ledger rows P0-02, P0-05, P0-06, P0-08; `docs/benchmarks/registry/p0-08_real_data_candidates.tsv`; commits `7725827`, `d9c28da`, `3c10c12`, `069994c`, `707df29`, `28818f5`.
+Trade-offs and negative evidence: **this entry is written after the fact, which is exactly the failure mode it documents.** A deviation recorded at the time is a decision; one recorded three sessions later is an archaeology. The gap was found by a planning-time audit, not by any check — nothing in the harness reads the dependency column, so a third deviation would be equally invisible. A ledger-consistency check (no task IN_PROGRESS or DONE whose dependency is TODO, unless a decision entry names the pair) is not written and belongs with the ledger parser at P0-07. Second, P0-02 remains TODO and is now a declared dependency of **P0-05**, the next task — so the same question arises immediately, and the answer chosen there should be recorded at the time rather than later.
+Consequences for the baseline and active feature set: none algorithmic; `src/cnmf/**` untouched.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>

@@ -29,7 +29,7 @@
 ## 2. Progress counts
 
 **6 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04).  
-TODO: 25 · IN_PROGRESS: 1 (P0-06 — selector specification frozen in PROTOCOL.md §1, but `delta` is null and no code exists) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
+TODO: 24 · IN_PROGRESS: 1 (P0-06 — selector specification frozen in PROTOCOL.md §1, but `delta` is null and no code exists) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
 
 Scientific adoption remains separate and untouched. P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance; S0-03 establishes the rules by which future evidence will be judged; the skeleton establishes that the loop executes end to end. **None of that is evidence for any feature.** Benchmark numbers now exist, but only at SMOKE tier, from fenced throwaway components, for the reference configuration `000` — there is nothing to compare them against, and `smoke_can_promote_feature: false` forbids using them if there were.
 
@@ -39,7 +39,7 @@ States: TODO → IN_PROGRESS → VERIFY → DONE; also BLOCKED and DROPPED. Keep
 
 | Prototype | Intervention | Software status | Scientific adoption | Evidence tier | Gate artifact |
 |---|---|---|---|---|---|
-| P0 | Unchanged baseline + evaluation | **PASS (smoke only)** | NOT_APPLICABLE | **SMOKE** | Not created — the gate cannot close while `cnmfbench/provisional.py` lists five throwaway components (D011) |
+| P0 | Unchanged baseline + evaluation | **PASS (smoke only)** | NOT_APPLICABLE | **SMOKE** | Not created — the gate cannot close while `cnmfbench/provisional.py` lists six throwaway components (D011) |
 | P1 | A: predictive rank selection | UNTESTED | NOT_EVALUATED | NONE | Not created |
 | P2 | B: donor-balanced discovery | UNTESTED | NOT_EVALUATED | NONE | Not created |
 | P3 | C: run-aware consensus | UNTESTED | NOT_EVALUATED | NONE | Not created |
@@ -436,18 +436,26 @@ Editing it is not a normal edit. Any change to a frozen rule creates a **new pro
 
 Two constants are **null by design** and stay null until P1: `delta` (the baseline selector's stability tolerance, §2) and the precision/recall threshold (§5.2). Both make their consumer **refuse to run** rather than fall back to a default. Do not "fix" this by supplying a default — that would be choosing a constant after seeing the data. Their calibration procedure is already frozen in §2.
 
-### The next task is P0-04: the four headline metrics
+### The next task is P0-05: nested donor folds and the leakage suite
 
-The loop closes. `simulate -> split -> real cNMF -> frozen-dictionary NNLS -> equal_donor_mean -> rows` runs end to end and has written 114 `RESULTS.tsv` rows at SMOKE. What is missing is what those rows are *for*: only prediction and cost metrics exist, and three of PROTOCOL §5.2's eleven names carry the scientific question.
+P0-04 is **DONE**. The loop `simulate -> split -> real cNMF -> frozen-dictionary NNLS -> equal_donor_mean -> rows` runs end to end, both recovery metrics are wired into the runner, and the four A-OFF configurations have run at SMOKE and DEVELOPMENT (4430 + 136 tracked rows, 199 tests, exit 0).
 
-P0-04 implements **program recovery, usage accuracy, and the corruption battery** (`IMPLEMENTATION_PROMPT.md:145-152`). Two traps are already known:
+P0-05 is blocking two things at once:
 
-- **`consensus_spectra` reorders programs by descending total usage and renames them 1..K** (`cnmf.py:938-946`), so program identity is not stable across runs — not even across re-runs on identical inputs, since the ordering derives from an unseeded refit and an unstable sort. `program_recovery_cosine_v1` therefore needs an explicit one-to-one maximum-weight matcher and may never key on program index.
-- **`program_recovery_cosine_v1` has a floor near 0.9.** A "dictionary" of K copies of the background scores ~0.95 against every true program. Report a **matched null** beside every recovery row or the number is uninterpretable.
+1. **Feature A cannot exist without it.** A is inner-validation rank selection. `outer_donor_folds` produces outer folds only; `inner_split_id` is a schema column that has never been populated; the fence says so directly — *"Outer folds only. No nested inner folds, so no rank selection is possible."*
+2. **It owns three of the six fenced components** — `splits.outer_donor_folds`, `splits.gene_panel`, `scoring.nnls_usages`. Completing it halves the fence.
 
-**D004 obliges two things at P0-04, not after:** confirm or revise the 1e-5 tolerance against corruption sensitivity, and **set the absolute floor for near-zero artifacts before the first such artifact appears**, since choosing it afterwards would be choosing it against a known case.
+**What it must make true.** PROTOCOL §3.2 names the transform `training_fitted_and_leakage_audited` and then says (`PROTOCOL.md:231-233`) that *"leakage audited" means the claim is tested, not asserted*. Only the first half of that name is earned today: the one existing leakage test (`test_splits_and_scoring.py:253`) is synthetic — no cNMF fit, no `G`, no `s_g`, no dictionary — and its own docstring calls it *"a down payment on P0-05"*.
 
-Then P0-02 / P0-05 hardening, the P0 gate, then P1/A. The user's target is the first `000` vs `100` comparison. Approved plan: `/home/mdmanurung/.claude/plans/plan-the-next-steps-warm-tome.md`.
+Three traps are already known:
+
+- **`PROTOCOL.md` contains no nested-fold section and no definition of `inner_split_id`.** The requirement lives only in `IMPLEMENTATION_PROMPT.md:160-173` and `ablation_plan.yaml:55` (`nested_donor_folds: true`). Implementing it is not a protocol amendment — §9 versions changes to rules PROTOCOL *states*, and it states none here — but `inner_split_id`'s meaning should be batched into the v1.1 amendment rather than left only in code.
+- **A leakage test that perturbs held-out cells *after* the split proves nothing.** The training-only `.h5ad` never contained them, so the test passes vacuously. Perturb the dataset before `prepare`. And include the positive control: perturbing outer-test values **must** change that fold's score, or a pipeline ignoring held-out data entirely would pass every invariance.
+- **SMOKE may not support nesting.** 8 donors, 2 outer folds → 4 training donors per outer fold, so `inner_donor_folds: 2` leaves 2 donors to fit an inner dictionary. If that is degenerate, record it as a finding — the same shape as *"SMOKE cannot test feature C"* — rather than quietly lowering `n_folds` until it runs.
+
+The config surface already exists and is ignored: every config declares `inner_donor_folds` and `panel_repetitions`, and nothing reads either.
+
+Then P0-06 (the selector and `delta`), the P0 gate, then P1/A. The user's target is the first `000` vs `100` comparison. Approved plan: `/home/mdmanurung/.claude/plans/plan-the-next-steps-warm-tome.md`.
 
 ### Session 2026-09-17/18 — the feasibility gate, its NO-GO, and P0-04's metrics (Claude Code)
 
@@ -494,9 +502,65 @@ Then P0-02 / P0-05 hardening, the P0 gate, then P1/A. The user's target is the f
 - Next task: **finish P0-04** — wire `program_recovery_cosine_v1` and `usage_error_v1` into the runner so they write rows. Then P0-05
 - Exact next command: `python -m pytest cnmfbench -q` to confirm 178 green, then edit `cnmfbench/skeleton.py`'s per-rank block to score recovery against `ds.true_spectra` restricted to the fold's `G`, aligned with `.to_scaled(s_g)`, with `matched_null_spectra` beside it
 
-### Five components are fenced as throwaway, and the P0 gate reads the fence
 
-`cnmfbench/provisional.py` lists `splits.outer_donor_folds`, `splits.gene_panel`, `scoring.nnls_usages`, `scoring.equal_donor_mean` and `skeleton.run`, each with its owning ledger task and what hardening requires (D011). Every row they produce carries `status: ok_provisional`.
+### Session 2026-09-18 — real data, then features B and C (Claude Code)
+
+Two sessions' work, logged together because neither was logged at the time.
+
+- Starting revision `b8ba39d` (harness) / `5dbc5ba` (upstream), ending `e03773e`. `src/cnmf/**` re-verified byte-identical after every commit.
+- Environment as above, BLAS pinned to 1 thread for every measurement.
+
+**Part 1 — P0-08 real data** (commits `7725827`, `d9c28da`, `3c10c12`, `069994c`, `707df29`, `28818f5`). Four datasets downloaded off `$HOME` per B003, to `/exports/para-lipg-hpc/mdmanurung/cnmf-realdata/raw/`, each sha256'd into `registry/p0-08_real_data_candidates.tsv`:
+
+| dataset | shape | donors | verdict |
+|---|---|---|---|
+| Kang 2018 | 24,673 × 15,706 | 8 | **USABLE** — raw counts |
+| Stephenson 2021 | 62,509 × 16,299 | — | **NOT USABLE** — `.X` log1p-normalised, no `layers`, no `.raw`; the pre-flagged trap fired |
+| Heart Cell Atlas v2 | 704,296 × 32,732 | 22 | raw counts confirmed; **CC BY 4.0, the only license actually read** |
+| AIDA Phase 1 v2 | 1,265,624 × 35,477 | **625** | raw counts in `.raw.X` — `.X` is normalised (max 6.5) vs `.raw.X` integer (max 198); the pre-flagged `.raw.X` gotcha fired exactly as predicted |
+
+First cNMF run on real data (Kang, `28818f5`): AUC 0.914–0.948 at every rank, peak 0.9475 at k=10; 16/30 top genes canonical ISGs against a list fixed in advance. Recorded as **a diagnostic, not a benchmark row** — no `RESULTS.tsv`/`EXPERIMENTS.tsv` rows written, configuration 000, no comparator. The ledger row P0-08 was **not** advanced: license is an explicit acceptance requirement and is satisfied for exactly one of the four. AIDA work postponed at the user's direction.
+
+**Part 2 — features B and C** (commits `2096ad0`, `b31ce50`, `328238e`, `ff9abd2`, `ef6f192`, `e03773e`).
+
+| command | outcome |
+|---|---|
+| SMOKE factorial, `smoke_{000m,001,010,011}.yaml` | exit 0 — 1878 / 72 tracked |
+| DEVELOPMENT factorial, `development_{000m,001,010,011}.yaml` | exit 0, ~3.7 min per configuration |
+| regeneration of all 8 runs after the fit-row fix | exit 0, no errors |
+| `python -m cnmfbench.skeleton --merge …` × 8 | exit 0 — tracked **4430 / 136** |
+| `python -m pytest cnmfbench -q` | exit 0 — **199 passed** |
+
+Findings, in order of how much they change what is believed:
+
+1. **Feature C fires only above `K_true`.** Zero contributions dropped in all 8 cells at k ≤ 7; 1–13 dropped in all 12 cells at k = 8,9,10. Where it fires it is a small consistent degradation — worse recovery in **12/12** cells, worse predictive error in 10/12, magnitude ≤ 0.0008 recovery and 0.11% loss. The pre-registered prediction that SMOKE was *incapable* of testing C and DEVELOPMENT was the right tier held.
+2. **A dose-response claim was written and then withdrawn.** Within a fold, drop count and rank rise together, so "scales with drops" and "scales with over-factorization" are collinear. At fixed k=10 the drop counts spread 3 to 13 and the effect does not follow — 13 drops gives +0.008 while 12 gives +1.013. Withdrawn in the registry with the reasoning kept beside it.
+3. **D016 — `hold_preprocessing_constant_across_B` holds for `G` and cannot hold for `s_g`.** `cnmf.prepare` computes the scale from whichever cells the sampling rule drew, and `src/cnmf/**` may not be edited. Measured drift: median 1.043, max 1.238. **The sign of the B effect flipped in 4 of 6 SMOKE cells** between unit conventions, falsifying a claim already published in the registry. Cross-arm endpoints now read in count units, pre-registered in `contracts/B.md` before any DEVELOPMENT row was read.
+4. **A registry file claimed "191 tests green" when the suite was 190 passed / 1 failed.** Corrected in place rather than dropped — `docs/AGENTS.md:36` forbids fabricating test outputs. The failing test was right: fit-scope rows carried a hardcoded `arm=full_training_pool` while their own `experiment_id` said `matched_budget`. Fixed, all 8 runs regenerated; all 12 C cells and all 96 SMOKE values reproduce exactly.
+5. **`assert_poolable` could not deliver what its docstring promised.** It refused rows spanning "different gene panels and per-gene scales", but `preprocessing_hash` carries `s_g_ddof` and not `s_g`, so both B arms hashed identically. Now keyed on `(preprocessing_hash, discovery_cells_hash)` — no formula change, so the guard stays content-keyed rather than versioned across old and new rows.
+6. **D017 — P0-04 could not be DONE while owning a fenced component.** `scoring.equal_donor_mean` had `owner_task="P0-04"` and `reason="No corruption or invariance tests."` while the ledger row claimed a full battery. Resolved by writing the aggregator's own battery (7 tests) rather than rewording the ledger, and un-fencing it with its decorator per D011's rule.
+
+- Status transitions: **P0-04 IN_PROGRESS → DONE** (6/31). Fence 7 → 6. Decisions added: D015 (C's tie-break rule, previously referenced from two files and never written), D016, D017.
+- Next action: **P0-05** — nested donor folds and the leakage suite.
+
+### Six components are fenced as throwaway, and the P0 gate reads the fence
+
+`cnmfbench/provisional.py` lists, with its owning ledger task and what hardening requires (D011):
+
+| component | owner | what hardening requires, in brief |
+|---|---|---|
+| `splits.outer_donor_folds` | P0-05 | nested outer/inner donor folds |
+| `splits.gene_panel` | P0-05 | panel repetitions with variance reported, + cross-arm panel-identity audit |
+| `scoring.nnls_usages` | P0-05 | the §3.2 leakage tests |
+| `skeleton.run` | P0-07 | workflow with restart and cache-invalidation tests |
+| `features.consensus_c` | **P3-01** | OFF-path equivalence at every tier claimed, + the tie-break rule settled (D015) |
+| `features.discovery_sample_b` | **P2-01** | sampling replicates so the draw's variance is reported (D016) |
+
+Every row they produce carries `status: ok_provisional`.
+
+`scoring.equal_donor_mean` was **un-fenced at D017** once its own corruption/invariance battery was written; earlier copies of this section still list it and are wrong. The code is authoritative.
+
+**A structural problem, named not solved:** two of the six are owned by *post-P0* tasks, so "the P0 gate cannot close until the fence is empty" currently makes P0 depend on P2-01 and P3-01. Either the gate condition is scoped to P0-owned components, or the P0 gate genuinely cannot close before P3. This wants a decision before `gates/P0.md` is written.
 
 `registry_is_empty()` is the gate check and is **false** today. Emptying it means deleting decorators and registry entries together, in a commit with a decision entry. Do not "tidy" the registry without doing the hardening it names.
 
