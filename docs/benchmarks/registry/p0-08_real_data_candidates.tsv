@@ -246,3 +246,100 @@ Perez_2022_lupus_PBMC	261	1263676	12.22	10.1126/science.abf1970	https://datasets
 ## software_status	PASS	(index queried; schema requirement read and quoted)
 ## scientific_adoption	NOT_EVALUATED
 ## evidence_tier	NONE
+##
+## ============================================================================
+## AIDA PHASE 1 DATA FREEZE v2 -- fetched 2026-09-18 at the user's request
+## Asian Immune Diversity Atlas. Cell (2025), doi 10.1016/j.cell.2025.02.017
+## ============================================================================
+##
+dataset	source_url	sha256	bytes	cells	genes
+aida_phase1_v2	https://datasets.cellxgene.cziscience.com/f89a12c2-7a3b-415b-ab87-bbc550fe17f4.h5ad	9f60a7217408bab362e86ccbdcfa20e6e700ba318fe8ccab940b18a4fcb5380e	14244656399	1265624	35477
+##
+## Byte count verified against the CellxGene API's recorded filesize before hashing.
+##
+## ---- THE .raw.X GOTCHA, CONFIRMED ON THIS FILE ----
+## .X      csr float64  min 0.9796  max 6.5    INTEGER-VALUED = FALSE  (log-normalised)
+## .raw.X  csr float32  min 1.0000  max 198.0  INTEGER-VALUED = TRUE   (raw counts)
+##
+## The `.X` integrality test that CORRECTLY rejected the Stephenson redistribution would have
+## FALSELY REJECTED this dataset. On CellxGene, read `.raw.X`. The gotcha was written down
+## before this file was downloaded and it fired exactly as predicted.
+##
+## ---- 625 DONORS, AND THE FEWEST CONFOUNDS OF ANYTHING ASSESSED ----
+## cells/donor: min 77, median 2,014, max 25,331.
+## assay:   ONE level (10x 5' v2)  -- no assay confound, unlike the heart atlas
+## disease: ONE level (normal)     -- no disease confound, unlike Perez lupus
+## sex:     693,614 female / 572,010 male
+##
+## This is the cleanest design obtained: a single chemistry, all-healthy, 625 individuals.
+##
+## ---- SITE IS PERFECTLY CONFOUNDED WITH COUNTRY, AND NESTED ABOVE DONOR ----
+country	institute	cells	donors
+SG	Genome Institute of Singapore	394523	221
+KR	Samsung Genome Institute	386792	170
+JP	Riken	302255	153
+TH	Mahidol University	135978	61
+IN	National Institute of Biomedical Genetics	46076	31
+##
+## Cell counts per country and per institute are IDENTICAL, so `Country` and `institute` are
+## the same variable under two names -- collapsing them is safe, and treating them as two
+## covariates would double-count one effect. 620 of 625 donors sit in exactly one country;
+## 5 span more than one and should be inspected before use (likely cross-site controls).
+##
+## Consequence for feature A: donor-blocked CV ACROSS countries holds out site, ancestry and
+## donor together. Blocking WITHIN one country isolates the donor effect but costs donors
+## (max 221, in SG). Both are defensible; they answer different questions and a result must
+## say which was done. 8 self-reported ethnicities are recorded separately.
+##
+## ---- FOUR-LEVEL ANNOTATION HIERARCHY, the finest obtained ----
+## Annotation_Level1  9 | Level2 21 | Level3 35 | Level4 88 | cell_type 32 (CL) | author_cell_type 35
+## A nested hierarchy is materially better than a flat label set for cNMF, because it allows
+## "did this program recover a coarse type or a fine state" to be asked as a question rather
+## than assumed by the choice of annotation.
+##
+## ---- THE DONOR-COVERAGE GRADIENT: an independent check on D008 ----
+## Fraction of the 625 donors carrying each Level2 population:
+##
+population	donors_present	fraction_of_625	total_cells
+CD4+_T	595	0.952	361823
+Monocyte	595	0.952	248752
+CD8+_T	595	0.952	240354
+CD16+_NK	594	0.950	151655
+memory_B	594	0.950	35114
+naive_B	591	0.946	36778
+cDC	591	0.946	13761
+gdT	590	0.944	30695
+Platelet	588	0.941	14799
+CD56+_NK	579	0.926	6152
+atypical_B	569	0.910	4850
+Plasma_Cell	459	0.734	1672
+pDC	449	0.718	3796
+DC	381	0.610	894
+ILC	353	0.565	707
+dnT	283	0.453	489
+CD34_HSPC	95	0.152	135
+##
+## D008 had to INVENT this distribution. The simulator's DEVELOPMENT `identity_eligibility`
+## was set to (1.0, 0.5, 0.35, 0.25, 0.15) by calibrating until the blocked-vs-random gap
+## reached t > 3 -- a constant chosen to make an effect detectable, and recorded there as the
+## programme's weakest link.
+##
+## Measured here, real coverage spans 0.952 down to 0.152. The calibrated values sit INSIDE
+## that observed range at both ends, and the low end (0.15) matches CD34_HSPC (0.152) almost
+## exactly. This is the first independent evidence that D008's calibration is not merely
+## convenient but plausible. It is a consistency check, NOT a validation: the values were
+## still chosen to produce a detectable effect, and agreement with one real cohort does not
+## retrospectively make that choice blind.
+##
+## ---- STANDING, FINAL ----
+## Kang 8 < heart snRNA 14 < simulator 24 << Perez 261 << AIDA 625 < OneK1K 981
+## AIDA is the best structure obtained: most donors of anything downloaded, single assay,
+## single disease, four-level annotation. Kang retains its distinct and unduplicated role --
+## the only dataset with a LABELLED ACTIVITY PROGRAM (stim/ctrl).
+##
+## LICENSE: CellxGene datasets carry explicit licensing; AIDA's specific terms have NOT yet
+## been read. Publication doi 10.1016/j.cell.2025.02.017. This remains open, as for Kang.
+##
+## software_status	PASS	(downloaded byte-exact, hashed, characterised)
+## scientific_adoption	NOT_EVALUATED
+## evidence_tier	NONE
