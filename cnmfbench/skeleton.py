@@ -1,7 +1,11 @@
 """The walking skeleton: the first end-to-end run that produces benchmark rows.
 
-Configuration `000`, SMOKE tier, fixed rank across the candidate grid, driving the **real
-pinned cNMF**. No feature switches, no rank selection, none of the P0-04 metrics.
+SMOKE and DEVELOPMENT tiers, fixed rank across the candidate grid, driving the **real pinned
+cNMF**. Still no rank selection — `delta` is null and PROTOCOL §2 requires the selector to
+refuse — so only the four A-OFF configurations `000/001/010/011` can run, and
+`check_preconditions` rejects any other. Features **B** (donor-balanced discovery) and **C**
+(one contribution per run in consensus) are independently switchable from the config, and both
+P0-04 metrics write rows. `SEALED_CONFIRMATION` still refuses.
 
 Two structural choices carry most of the correctness:
 

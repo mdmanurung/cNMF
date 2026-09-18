@@ -157,9 +157,16 @@ class DonorAggregate:
         self.n_failed_donors = n_failed_donors
 
 
-@provisional("scoring.equal_donor_mean")
 def equal_donor_mean(per_cell_loss, donor_ids):
     """Average within donor first, then unweighted across donors (§3.5).
+
+    Un-fenced at P0-04 (D017) once its own corruption/invariance battery was written —
+    `test_splits_and_scoring.py`, seven tests: invariance to cell order, to donor
+    relabelling, to replicating a donor's cells, and positive homogeneity; plus the
+    penalty that damaging one of n donors moves the aggregate by exactly `delta/n`, and
+    the refusals. The recovery metrics' battery does not cover any of these: the property
+    this function exists for — a donor's weight is independent of its cell count — is
+    invisible to any test of the metric being aggregated.
 
     Donors are the independent unit; cells within a donor are not independent samples.
     Donors with zero scored cells are **excluded and counted**, never entered as zeros —

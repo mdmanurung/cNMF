@@ -285,6 +285,22 @@ Consequences for the baseline and active feature set: none algorithmic; `src/cnm
 Protocol/data versions superseded: none. The ablation plan's `hold_preprocessing_constant_across_B: true` is not edited; this entry records that it is met for `G` and unmeetable for `s_g`, which is a finding about the constraint set, not a change to the plan.
 Independent confirmation needed: yes — sampling replicates, so the draw's own variance is reported rather than assumed negligible. Until then no B number may inform an adoption decision.
 
+## D017 — `scoring.equal_donor_mean` leaves the fence, because P0-04 could not be DONE while owning a fenced component
+
+Date/time: 2026-09-18, features B/C session
+Type: implementation
+Related task, feature, gate: P0-04, gate P0
+Context: P0-04 was marked DONE with a ledger row claiming "Full corruption battery: three invariances asserted to 1e-12, four penalties asserted." `cnmfbench/provisional.py` simultaneously carried `scoring.equal_donor_mean` with `owner_task="P0-04"` and `reason="No corruption or invariance tests."` **Both statements were committed in the same change and they contradict each other.** They are about different things — the battery that exists is in `test_recovery.py` and covers `program_recovery_cosine_v1` / `usage_error_v1`; the fence entry is about the §3.5 aggregator, which had three tests and no battery. Sharper still, every row cited as P0-04's acceptance evidence carries `status: ok_provisional` naming `scoring.equal_donor_mean` among the components that produced it: the evidence declared itself the output of throwaway code owned by the task being marked DONE.
+`test_every_provisional_component_names_a_real_ledger_task` did not catch this because it checks that the owner task *exists*, not that it is not already DONE.
+Options considered: (a) revert P0-04 to IN_PROGRESS; (b) write the aggregator's battery and un-fence it, per D011's rule that an entry leaves only with its decorator and a decision entry; (c) reword the ledger row to exclude the aggregator.
+Decision: **(b).** Seven tests added in `cnmfbench/tests/test_splits_and_scoring.py`; the `@provisional` decorator and the registry entry are deleted together. `PROVISIONAL` now holds six components, so `registry_is_empty()` stays False and the **P0 gate remains open**.
+Reason: (c) is bookkeeping that leaves the real gap open — the aggregator sits under every `equal_donor_mean` row in `RESULTS.tsv` and is the single most-used untested component in the harness. (a) is honest but wastes the fact that the missing work is small and well specified. The battery is the aggregator's OWN invariances, which no test of the metric being aggregated can reach: invariance to cell order, to donor relabelling, to **replicating a donor's cells** (the property §3.5 exists for — a pooled cell mean fails this and the test asserts it fails), positive homogeneity (which D016 relies on when it reads B in count units), the penalty that damaging one of n donors moves the aggregate by exactly `delta/n` rather than by that donor's cell share, and the two refusals.
+Evidence paths and experiment IDs: `cnmfbench/scoring.py`; `cnmfbench/provisional.py`; `cnmfbench/tests/test_splits_and_scoring.py`, 28 tests in the file, 199 in the suite, exit 0.
+Trade-offs and negative evidence: **rows already written still name `scoring.equal_donor_mean` in their `notes`**, a component no longer in the registry. They are not regenerated and should not be: they were produced before the hardening, and their `ok_provisional` status remains correct regardless, since six components — including `scoring.nnls_usages` and `skeleton.run`, which every row touches — are still fenced. Second, the check that missed this contradiction is **still** only checking that an owner task exists; a check that an owner task is not DONE would have caught it and is not written. Recorded as the open gap rather than fixed here, because it wants the ledger parser to understand task states and that is P0-07's business.
+Consequences for the baseline and active feature set: none algorithmic; `src/cnmf/**` untouched. P0-04 stays DONE, now without the contradiction.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>

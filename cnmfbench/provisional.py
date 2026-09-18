@@ -73,12 +73,6 @@ PROVISIONAL = {
             "must leave G, s_g, the dictionary and inference-panel usages unchanged.",
         ),
         ProvisionalComponent(
-            component_id="scoring.equal_donor_mean",
-            owner_task="P0-04",
-            reason="No corruption or invariance tests.",
-            hardening_requires="The IMPLEMENTATION_PROMPT.md:152 corruption battery.",
-        ),
-        ProvisionalComponent(
             component_id="skeleton.run",
             owner_task="P0-07",
             reason="Linear in-process driver. No cache, no restart, no CI, no SLURM.",

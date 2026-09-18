@@ -141,6 +141,89 @@ def test_equal_donor_mean_refuses_when_no_donor_has_a_scored_cell():
         equal_donor_mean(np.array([]), [])
 
 
+# ------------------------- the equal_donor_mean corruption/invariance battery (P0-04)
+#
+# `IMPLEMENTATION_PROMPT.md:152` requires the metrics to "penalize damaging changes and
+# remain invariant to irrelevant permutations". The recovery metrics got their battery in
+# `test_recovery.py`; the AGGREGATOR did not, and its fence entry said so. These are its
+# own invariances, which are not the recovery metric's: the property that makes
+# `equal_donor_mean` worth having — a donor's weight does not depend on its cell count —
+# is invisible to any test of the metric being aggregated.
+
+
+def test_equal_donor_mean_is_invariant_to_cell_order():
+    rng = np.random.default_rng(0)
+    loss = rng.random(60) * 10
+    donors = np.array(["a", "b", "c"] * 20)
+    perm = rng.permutation(60)
+    base = equal_donor_mean(loss, donors)
+    shuffled = equal_donor_mean(loss[perm], donors[perm])
+    assert shuffled.value == pytest.approx(base.value, abs=1e-12)
+    assert shuffled.per_donor == pytest.approx(base.per_donor, abs=1e-12)
+
+
+def test_equal_donor_mean_is_invariant_to_donor_relabelling():
+    """Donor ids are identifiers, not data. The aggregator sorts them, so a relabelling
+    that reorders them must not move the value."""
+    loss = np.array([1.0, 2.0, 3.0, 40.0])
+    a = equal_donor_mean(loss, ["a", "a", "a", "b"])
+    b = equal_donor_mean(loss, ["zzz", "zzz", "zzz", "aaa"])
+    assert b.value == pytest.approx(a.value, abs=1e-12)
+    assert sorted(b.per_donor.values()) == pytest.approx(sorted(a.per_donor.values()))
+
+
+def test_equal_donor_mean_is_invariant_to_replicating_a_donors_cells():
+    """THE PROPERTY THE AGGREGATOR EXISTS FOR. Duplicating every cell of one donor leaves
+    that donor's within-donor mean unchanged, so it must not gain influence. A pooled cell
+    mean would shift here, which is exactly the failure §3.5 is guarding against."""
+    loss = np.array([1.0, 1.0, 10.0])
+    donors = ["a", "a", "b"]
+    base = equal_donor_mean(loss, donors)
+    fat = equal_donor_mean(np.concatenate([loss, [1.0] * 97]), donors + ["a"] * 97)
+    assert fat.value == pytest.approx(base.value, abs=1e-12)
+    assert np.mean(np.concatenate([loss, [1.0] * 97])) != pytest.approx(base.value)
+
+
+def test_equal_donor_mean_is_positively_homogeneous():
+    """A change of units on the loss must scale the aggregate by the same factor and
+    nothing else — the property D016 relies on when it reads B in count units."""
+    loss = np.array([1.0, 3.0, 7.0, 11.0])
+    donors = ["a", "a", "b", "c"]
+    base = equal_donor_mean(loss, donors)
+    scaled = equal_donor_mean(loss * 4.0, donors)
+    assert scaled.value == pytest.approx(4.0 * base.value, rel=1e-12)
+
+
+def test_corrupting_one_donor_moves_the_aggregate_by_exactly_its_share():
+    """The penalty side. With n donors, damaging one must move the value by delta/n — not
+    by delta weighted by that donor's cell count, which is what a pooled mean would do."""
+    loss = np.array([1.0] * 9 + [1.0] * 1)
+    donors = ["a"] * 9 + ["b"]
+    base = equal_donor_mean(loss, donors)
+    corrupted = loss.copy()
+    corrupted[:9] += 6.0  # donor 'a', the one holding 90% of the cells
+    got = equal_donor_mean(corrupted, donors)
+    assert got.value - base.value == pytest.approx(6.0 / 2, abs=1e-12)
+
+
+def test_an_excluded_donor_is_counted_and_never_entered_as_a_zero():
+    """A zero would read as a perfect prediction and would drag the mean DOWN, turning a
+    donor that could not be scored into evidence that the fit was good."""
+    loss = np.array([4.0, 6.0])
+    agg = equal_donor_mean(loss, ["a", "b"])
+    assert agg.value == pytest.approx(5.0)
+    assert agg.n_eligible_donors == 2 and agg.n_failed_donors == 0
+    # A donor present in the labels but with no cells cannot arise from the array form, so
+    # the guarantee is checked at the boundary the runner actually hits: an empty input.
+    with pytest.raises(ContractViolation):
+        equal_donor_mean(np.array([]), [])
+
+
+def test_equal_donor_mean_refuses_mismatched_lengths_rather_than_broadcasting():
+    with pytest.raises(ValueError, match="losses for"):
+        equal_donor_mean(np.ones(5), ["a"] * 4)
+
+
 def test_null_dictionary_must_be_given_scaled_input():
     """The 4x trap: the null profile must be the mean of X = raw/s_g, not of raw counts.
     Measured on SMOKE, using raw counts inflates the floor from ~24 to ~97 with no
