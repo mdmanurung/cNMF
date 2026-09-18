@@ -96,10 +96,17 @@ Megakaryocytes	8	1	132
 ## donor-blocking result at n = 8 would be measuring the thing D008 says dominates. Kang is
 ## not the dataset for A's premise and should not be used to claim anything about it.
 ##
-## ---- NOT YET VERIFIED ----
-## LICENSES FOR BOTH. AGENTS.md requires inspecting licenses before reuse and none has been
-## read. Kang 2018 originates at GEO GSE96583; the pertpy redistribution's terms are
-## unstated. No result may be published from either until this is closed.
+## ---- LICENSE POSITION, recorded precisely ----
+## USER STATES (2026-09-18): "these are MIT licenses", covering Kang and AIDA. Recorded as
+## the user's statement and acted on. NOT independently verified by this session, and
+## recorded that way rather than as a verification, per AGENTS.md's rule against fabricating
+## a check that was not performed.
+##
+## One caveat noted once, for whoever reads this later: MIT is a SOFTWARE license. pertpy's
+## and scverse's code is MIT; data redistributed through them may separately carry the
+## originating study's terms (Kang 2018 originates at GEO GSE96583, and CellxGene records a
+## per-dataset license). The only license this session actually read is the Heart Cell
+## Atlas's CC BY 4.0. Confirm before external publication; local runs are unaffected.
 ## Also unverified: whether gene symbols need deduplication against the cNMF gene-list path,
 ## and whether the shallow library sizes interact with `num_highvar_genes` selection.
 ##
