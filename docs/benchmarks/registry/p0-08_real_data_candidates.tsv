@@ -350,3 +350,88 @@ CD34_HSPC	95	0.152	135
 ## software_status	PASS	(downloaded byte-exact, hashed, characterised)
 ## scientific_adoption	NOT_EVALUATED
 ## evidence_tier	NONE
+##
+## ============================================================================
+## FIRST cNMF RUN ON REAL DATA -- Kang 2018, 2026-09-18
+## ============================================================================
+##
+## A DIAGNOSTIC, NOT A BENCHMARK ROW. No RESULTS.tsv or EXPERIMENTS.tsv rows were written:
+## the harness's provenance (dataset_manifest_hash, a pre-registered comparison, an evidence
+## tier) does not apply to an ad-hoc run on real data, and manufacturing those fields to make
+## it look like benchmark evidence would be worse than leaving it out.
+##
+## Run dir: /exports/para-lipg-hpc/mdmanurung/cnmf-realdata/kang_run/ (gitignored, off $HOME)
+## 24,673 cells x 15,706 genes -> 2,000 HVGs. ranks [6,8,10,12,14], n_iter 10, seed 20260918,
+## density_threshold 2.0, max_NMF_iter 1000, beta_loss frobenius. Wall: prepare 10s,
+## factorize+combine 482s. Configuration is BASELINE cNMF -- features A, B, C all OFF.
+##
+## SCORING FOLLOWS PROTOCOL 3.1: per-cell usages are exact NNLS against the frozen
+## `median_spectra` dictionary in the engine's scaled space. NOT `consensus_usages` (the
+## final TPM refit, which 3.1 forbids for scoring) and NOT `gene_spectra_score` (signed).
+## `cnmfbench.scoring.nnls_usages` is one of the five fenced provisional components (D011),
+## so this inherits that status.
+##
+## ---- QUESTION: does any inferred program track the known stim/ctrl label? ----
+## AUC of program usage separating stim from ctrl, per rank:
+##
+candidate_rank	best_program	best_AUC	runner_up_AUC	median_abs_AUC_minus_half
+6	3	0.9137	0.2663	0.0436
+8	4	0.9235	0.2640	0.0348
+10	4	0.9475	0.2567	0.0372
+12	7	0.9149	0.7071	0.0622
+14	5	0.9287	0.6418	0.0534
+##
+## ANSWER: YES, at every rank tested, AUC 0.914 - 0.948, peaking at k=10.
+##
+## The peak sits where the biology predicts: Kang has 8 annotated cell types plus an induced
+## response, so ~9-10 programs is the expected structure.
+##
+## SEPARATION IS NOT TRIVIALLY AVAILABLE. Median |AUC - 0.5| across all programs is
+## 0.035 - 0.062, so the overwhelming majority of programs do not separate the conditions at
+## all. The interferon program is a clear outlier rather than one of many, which is what
+## makes the result meaningful -- if most programs had separated, the metric would be
+## measuring the split rather than the fit.
+##
+## The runner-up at k=6,8,10 sits near AUC 0.26, i.e. it separates in the OPPOSITE direction
+## (enriched in ctrl, depleted by stimulation). Not investigated here.
+##
+## ---- THE PROGRAM IS UNAMBIGUOUSLY INTERFERON, BY GENE CONTENT ----
+## k=10, program 4, top 30 genes of `median_spectra`:
+##
+## ISG15, RSAD2, ISG20, APOBEC3A, IFITM3, IFIT3, LY6E, TMSB10, DYNLT1, IFIT2, IFIT1, CXCL11,
+## CXCL10, IFI6, PLSCR1, OAS1, TYMP, H3F3B, MX1, TNFSF10, IL1RN, BST2, TNFSF13B, IDO1, CCL8,
+## MYL12A, SAMD9L, IL4I1, IRF7, HSPA1A
+##
+## 16 of the top 30 are canonical interferon-stimulated genes against a fixed list written
+## BEFORE the genes were seen (ISG15, RSAD2, ISG20, IFITM3, IFIT3, LY6E, IFIT2, IFIT1,
+## CXCL10, IFI6, PLSCR1, OAS1, MX1, BST2, SAMD9L, IRF7). That list is conservative: APOBEC3A,
+## CXCL11, TYMP, TNFSF10, IDO1, CCL8 and IL4I1 are also interferon-inducible but were not on
+## it, so 16/30 is a floor, not an estimate.
+##
+## This is the point of using Kang at all. The claim "cNMF recovered the interferon program"
+## is checkable against a recorded per-cell label AND against gene identity fixed in advance
+## -- not against a judgement that a gene list looks biologically plausible, which is the
+## unfalsifiable reasoning the programme exists to avoid.
+##
+## ---- TWO CONSISTENCY CHECKS THAT ALSO PASS ----
+## 1. Per-donor mean usage of the program ranges 0.0841 - 0.1449 across the 8 donors, so it
+##    is shared, not an artifact of one individual.
+## 2. Its highest-using cell type is CD14+ Monocytes (mean usage 0.309). Monocytes are the
+##    strongest type I interferon responders in PBMC, so the cell-type placement is right as
+##    well as the gene content.
+##
+## ---- WHAT THIS DOES AND DOES NOT ESTABLISH ----
+## DOES: baseline cNMF, unmodified at the pinned SHA, recovers a real activity program from
+## real data with the harness's own protocol-compliant scoring path. The pipeline works
+## end to end on real input, and the scaled-space/count-space alignment (D013) and the
+## median_spectra scoring route (3.1) hold outside simulation.
+##
+## DOES NOT: say anything about features A, B or C. This is configuration 000 with no
+## comparator. It is not a benchmark result, promotes nothing, and no adoption decision may
+## cite it. It also does not test rank SELECTION -- the AUC peak at k=10 was read off a grid,
+## which is exactly the "winning K" that 5.3 and 1.5 forbid recording on an A-OFF row, and it
+## is reported here as a diagnostic observation rather than a selected rank.
+##
+## software_status	PASS	(run completed; 482s factorize+combine)
+## scientific_adoption	NOT_EVALUATED	(no comparator; configuration 000 only)
+## evidence_tier	NONE	(ad-hoc diagnostic on real data, outside the tier system)
