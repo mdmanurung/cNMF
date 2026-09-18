@@ -1,0 +1,108 @@
+## P0-08 real-data candidate assessment, 2026-09-18. PBMC prioritised at the user's direction.
+##
+## Data lives OFF the repo and off $HOME (B003: /home is 96% full):
+##   /exports/para-lipg-hpc/mdmanurung/cnmf-realdata/raw/
+## This file is the tracked manifest; the .h5ad files are not in version control.
+##
+## Fetched by direct URL read from pertpy's own source rather than by installing pertpy.
+## Installing it into `cnmf_bench` would change `environment_hash`, which is recorded
+## provenance on all 1342 existing rows and underpins D004's same-environment tolerance
+## claim. Downloading a file and reading it with the already-present anndata changes nothing.
+##
+dataset	source_url	sha256	cells	genes
+kang_2018	https://exampledata.scverse.org/pertpy/kang_2018.h5ad	e6a5adac64dcdeb36eaba27db49b63e0c64bb0ed4a64c6705971506b41c39830	24673	15706
+stephenson_2021_subsampled	https://exampledata.scverse.org/pertpy/stephenson_2021_subsampled.h5ad	2345f3c512552892bb8327f4779dc69972faccac3b00dcf90c0e9d9ae5ab738e	62509	16299
+##
+## ============================ VERDICT ============================
+## kang_2018                  -> USABLE
+## stephenson_2021_subsampled -> NOT USABLE AS DISTRIBUTED (no counts anywhere in the file)
+##
+## ---- THE CHECK THAT DECIDED IT: is `.X` raw integer counts? ----
+## cNMF needs counts. `compute_tpm` and the PROTOCOL 3.2 transform are both meaningless on
+## normalised input, and NOTHING RAISES -- the pipeline returns numbers either way. This was
+## flagged as the primary trap before either file was downloaded, and it fired immediately.
+##
+dataset	X_dtype	X_max	X_integer_valued	layers	raw	verdict
+kang_2018	float32 (sparse)	1668.0	TRUE	none	None	raw counts, usable
+stephenson_2021_subsampled	float32 (sparse)	7.5257	FALSE	none	None	log1p-normalised, unusable
+##
+## Stephenson evidence: max 7.5257 is a log1p signature; nonzero values repeat exactly
+## (0.22479707), which is what per-cell normalisation produces; row sums are ~1259-1458
+## rather than integers. `layers` is empty and `.raw` is None, so the counts are not merely
+## hidden elsewhere in the file -- they are absent. The pertpy docstring explains why: cells
+## were "mapped to a reference atlas of healthy PBMCs from 12 studies with scArches", and the
+## distributed object is the processed result of that mapping.
+##
+## This does not make Stephenson unusable in principle -- the raw counts exist at the
+## original source (Stephenson et al. 2021 Nat Med, Haniffa lab; ArrayExpress E-MTAB-10026
+## and covid19cellatlas.org). It makes the PERTPY DISTRIBUTION unusable. Recorded so the
+## 669 MB download is not repeated by anyone reading this.
+##
+## ---- KANG 2018 STRUCTURE, measured ----
+## 24,673 cells x 15,706 genes, no duplicate gene names, 0 cells below 200 counts.
+## The donor column is named `replicate`, not `donor` -- a name that would silently pass an
+## eyeball check for "is there donor structure" and find nothing.
+##
+donor	ctrl_cells	stim_cells	total_cells
+patient_101	858	1166	2024
+patient_107	517	525	1042
+patient_1015	2738	2352	5090
+patient_1016	1723	1635	3358
+patient_1039	461	641	1102
+patient_1244	1879	1464	3343
+patient_1256	2108	2026	4134
+patient_1488	2031	2549	4580
+##
+## 8 donors; cells/donor 1042 - 5090, median 3350.
+## Library size min 562, median 1246, max 11816 -- shallow, this is 2017-era 10x chemistry.
+##
+## ---- TWO PROPERTIES THAT MAKE IT A CLEAN TEST ----
+##
+## 1. CONDITION IS NOT CONFOUNDED WITH DONOR. The stim fraction ranges 0.438 - 0.582 across
+##    the eight donors, so every donor contributes both arms in near-equal measure. The
+##    IFN-beta activity program is therefore separable from donor identity, which is exactly
+##    the confound that would make an activity-recovery claim uninterpretable.
+##
+## 2. EVERY CELL TYPE IS PRESENT IN EVERY DONOR (8/8 for all eight types). Contrast the
+##    simulator's own DEVELOPMENT fold outer_0, where one identity program had a SINGLE
+##    training carrier donor. Kang has no such degeneracy, so it tests a different regime --
+##    and the simulator remains the only place that degenerate case can be studied.
+##
+cell_type	donors_present	min_cells_in_any_donor	total_cells
+CD4 T cells	8	379	11238
+CD14+ Monocytes	8	290	5697
+B cells	8	67	2651
+NK cells	8	43	1716
+CD8 T cells	8	18	1621
+FCGR3A+ Monocytes	8	40	1089
+Dendritic cells	8	28	529
+Megakaryocytes	8	1	132
+##
+## Megakaryocytes reach 1 cell in the thinnest donor: a genuine rare population, and the
+## natural real-data test for rare-program recovery.
+##
+## ---- WHAT KANG CAN AND CANNOT ANSWER ----
+##
+## CAN: does cNMF recover a KNOWN ACTIVITY PROGRAM? The interferon-beta response is induced,
+## strong, and carries a per-cell `label` (stim/ctrl, 12358/12315). An inferred program that
+## tracks that label is checkable against a recorded fact rather than against a judgement
+## about whether a gene list "looks biological" -- which is the unfalsifiable reasoning this
+## programme exists to avoid. This is the closest thing to ground truth real data offers, and
+## it fills the gap that every identity-only dataset leaves.
+##
+## CANNOT: test feature A well. EIGHT DONORS IS THIN. Two outer folds gives 4 train / 4 test
+## before inner folds, against the simulator's 24. D008 already established that donor COUNT
+## is the dominant effect (t = +4.30) and per-donor leakage is not (t = -0.37), so a
+## donor-blocking result at n = 8 would be measuring the thing D008 says dominates. Kang is
+## not the dataset for A's premise and should not be used to claim anything about it.
+##
+## ---- NOT YET VERIFIED ----
+## LICENSES FOR BOTH. AGENTS.md requires inspecting licenses before reuse and none has been
+## read. Kang 2018 originates at GEO GSE96583; the pertpy redistribution's terms are
+## unstated. No result may be published from either until this is closed.
+## Also unverified: whether gene symbols need deduplication against the cNMF gene-list path,
+## and whether the shallow library sizes interact with `num_highvar_genes` selection.
+##
+## software_status	PASS	(both files downloaded, hashed and characterised)
+## scientific_adoption	NOT_EVALUATED	(no benchmark run has used either)
+## evidence_tier	NONE	(characterisation only; nothing measured against cNMF yet)
