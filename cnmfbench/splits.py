@@ -24,10 +24,40 @@ from . import PROTOCOL_VERSION
 from .hashing import cell_set_hash, parameter_hash
 from .provisional import provisional
 
-__all__ = ["DonorFold", "Panel", "outer_donor_folds", "gene_panel"]
+__all__ = [
+    "DonorFold",
+    "InnerFold",
+    "Panel",
+    "outer_donor_folds",
+    "inner_donor_folds",
+    "gene_panel",
+]
 
 DonorFold = namedtuple("DonorFold", "outer_split_id train_donors test_donors")
+InnerFold = namedtuple("InnerFold", "inner_split_id train_donors validation_donors")
 Panel = namedtuple("Panel", "mask_id inference_genes validation_genes")
+
+
+def _held_out_blocks(donor_ids, n_folds, rng):
+    """Permute donors and stripe them into `n_folds` held-out blocks.
+
+    Shared by the outer and inner splits so the two cannot drift apart — the inner split
+    is not a second implementation of the same idea, which is how two splitters end up
+    with different determinism guarantees.
+
+    Striping (`[i::n_folds]`) keeps block sizes within one of each other for any donor
+    count. That matters most at the small end, where the inner split lives: at SMOKE an
+    outer fold leaves only 4 training donors.
+
+    Returns `(all_donors_sorted, blocks)`. The caller decides what a block *means* — held
+    out for testing, or held out for inner validation.
+    """
+    donors = sorted(set(str(d) for d in donor_ids))
+    if n_folds < 2 or n_folds > len(donors):
+        raise ValueError(f"n_folds={n_folds} is not usable with {len(donors)} donors")
+    order = rng.permutation(len(donors))
+    shuffled = [donors[i] for i in order]
+    return donors, [sorted(shuffled[i::n_folds]) for i in range(n_folds)]
 
 
 @provisional("splits.outer_donor_folds")
@@ -43,13 +73,7 @@ def outer_donor_folds(donor_ids, n_folds, seed):
     so uses ground truth to choose a split, which §6.3 forbids; an unlucky split is a
     recorded property of the run, not something to fix.
     """
-    donors = sorted(set(str(d) for d in donor_ids))
-    if n_folds < 2 or n_folds > len(donors):
-        raise ValueError(f"n_folds={n_folds} is not usable with {len(donors)} donors")
-
-    order = np.random.default_rng(seed).permutation(len(donors))
-    shuffled = [donors[i] for i in order]
-    blocks = [sorted(shuffled[i::n_folds]) for i in range(n_folds)]
+    donors, blocks = _held_out_blocks(donor_ids, n_folds, np.random.default_rng(seed))
 
     folds = []
     for i, test in enumerate(blocks):
@@ -57,6 +81,52 @@ def outer_donor_folds(donor_ids, n_folds, seed):
         if not train or not test:
             raise ValueError(f"fold {i} is degenerate: {len(train)} train, {len(test)} test")
         folds.append(DonorFold(f"outer_{i}", tuple(train), tuple(test)))
+    return folds
+
+
+@provisional("splits.outer_donor_folds")
+def inner_donor_folds(train_donors, n_folds, seed, outer_index):
+    """Split ONE outer fold's training donors into inner training/validation folds.
+
+    The second level of `IMPLEMENTATION_PROMPT.md:160-173`:
+
+        Outer training donors
+          ├── inner training donors    → preprocessing + candidate dictionary fits
+          └── inner validation donors  → score candidates, choose K if A is on
+
+    **This is the thing whose absence made feature A impossible.** A is inner-validation
+    rank selection; with outer folds alone there is no inner validation to select on.
+
+    `outer_index` enters the seed so that two outer folds do not receive the same inner
+    partition of different donor sets — which would be harmless but would make an inner
+    fold's identity ambiguous across the run. Derived through `SeedSequence` rather than
+    by arithmetic on the seed, the same way `gene_panel` mixes its repetition, so that
+    neighbouring `(seed, outer_index)` pairs do not give correlated streams.
+
+    The caller passes `fold.train_donors`, never the full donor list: **an inner split
+    that could see an outer test donor would defeat the whole nesting.** That is checked
+    by the caller's own fold object rather than here, because this function is not given
+    the test donors and so cannot verify it — `test_an_inner_fold_never_contains_an_outer_test_donor`
+    asserts the composition end to end.
+
+    Note the `@provisional` id is shared with `outer_donor_folds`: the fence entry's
+    `hardening_requires` is "Nested outer/inner donor folds", i.e. this function IS that
+    component's hardening, and the two are un-fenced together or not at all.
+    """
+    seq = np.random.SeedSequence([int(seed), int(outer_index)])
+    donors, blocks = _held_out_blocks(train_donors, n_folds, np.random.default_rng(seq))
+
+    folds = []
+    for j, validation in enumerate(blocks):
+        train = sorted(d for d in donors if d not in set(validation))
+        if not train or not validation:
+            raise ValueError(
+                f"inner fold {j} of outer_{outer_index} is degenerate: {len(train)} train, "
+                f"{len(validation)} validation. With {len(donors)} training donors and "
+                f"n_folds={n_folds} there is not enough to nest — reduce the tier's fold "
+                "count deliberately and record it, rather than letting a fold vanish."
+            )
+        folds.append(InnerFold(f"inner_{j}", tuple(train), tuple(validation)))
     return folds
 
 

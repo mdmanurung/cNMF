@@ -12,7 +12,7 @@ from cnmfbench.scoring import (
     count_unit_error, equal_donor_mean, nnls_usages, null_dictionary, scoreable_mask,
     squared_prediction_error, to_training_scale, training_gene_scale,
 )
-from cnmfbench.splits import gene_panel, outer_donor_folds
+from cnmfbench.splits import gene_panel, inner_donor_folds, outer_donor_folds
 
 DONORS = [f"donor_{i:03d}" for i in range(8)]
 GENES = [f"gene_{i:05d}" for i in range(100)]
@@ -41,6 +41,88 @@ def test_folds_are_independent_of_input_donor_order():
     # A split that depended on the order donors happened to arrive in would silently
     # change when the simulator's cell ordering changed.
     assert outer_donor_folds(DONORS, 2, 7) == outer_donor_folds(list(reversed(DONORS)), 2, 7)
+
+
+# --------------------------------------------------- nested (inner) donor folds, P0-05
+#
+# The level whose absence made feature A impossible: A selects rank on inner validation,
+# and until now there was no inner validation to select on.
+
+
+def test_an_inner_fold_never_contains_an_outer_test_donor():
+    """THE LOAD-BEARING ONE. Nesting exists to keep outer test donors out of every
+    decision made inside the fold. If an outer test donor reached an inner split, rank
+    selection would be choosing K with the data it is later scored on, and every A
+    result would be optimistic with nothing crashing."""
+    for fold in outer_donor_folds(DONORS, 2, seed=7):
+        held_out = set(fold.test_donors)
+        for inner in inner_donor_folds(fold.train_donors, 2, seed=7, outer_index=0):
+            leaked = held_out & (set(inner.train_donors) | set(inner.validation_donors))
+            assert not leaked, f"outer test donor(s) {sorted(leaked)} reached {inner.inner_split_id}"
+
+
+def test_inner_folds_partition_the_outer_training_donors_exactly():
+    fold = outer_donor_folds(DONORS, 2, seed=7)[0]
+    inners = inner_donor_folds(fold.train_donors, 2, seed=7, outer_index=0)
+    seen = []
+    for inner in inners:
+        assert not set(inner.train_donors) & set(inner.validation_donors)
+        assert set(inner.train_donors) | set(inner.validation_donors) == set(fold.train_donors)
+        seen += list(inner.validation_donors)
+    assert sorted(seen) == sorted(fold.train_donors), "each donor validates exactly once"
+
+
+def test_inner_folds_are_deterministic_and_do_not_read_global_numpy_state():
+    """`cnmf.prepare` calls `np.random.seed()` internally (`cnmf.py:601`), so a splitter
+    reading global state would return different folds depending on whether a fit had
+    already run in this process. Seeding the global RNG between calls must change
+    nothing."""
+    fold = outer_donor_folds(DONORS, 2, seed=7)[0]
+    a = inner_donor_folds(fold.train_donors, 2, seed=11, outer_index=0)
+    np.random.seed(12345)
+    b = inner_donor_folds(fold.train_donors, 2, seed=11, outer_index=0)
+    assert a == b
+
+
+def test_the_outer_index_changes_the_inner_partition():
+    """Two outer folds must not receive the same inner partition, or an inner fold's
+    identity would be ambiguous across the run."""
+    donors = [f"d{i}" for i in range(12)]
+    a = inner_donor_folds(donors, 3, seed=5, outer_index=0)
+    b = inner_donor_folds(donors, 3, seed=5, outer_index=1)
+    assert [f.validation_donors for f in a] != [f.validation_donors for f in b]
+
+
+def test_inner_folds_are_independent_of_input_donor_order():
+    donors = [f"d{i:02d}" for i in range(9)]
+    a = inner_donor_folds(donors, 3, seed=3, outer_index=0)
+    b = inner_donor_folds(list(reversed(donors)), 3, seed=3, outer_index=0)
+    assert a == b
+
+
+def test_inner_split_ids_are_scoped_and_stable():
+    ids = [f.inner_split_id for f in inner_donor_folds([f"d{i}" for i in range(6)], 3, 1, 0)]
+    assert ids == ["inner_0", "inner_1", "inner_2"]
+
+
+def test_too_few_training_donors_raises_and_says_what_to_do():
+    """SMOKE leaves 4 training donors per outer fold. Asking for more inner folds than
+    donors must refuse loudly — silently dropping a fold would change the evaluator
+    without changing any recorded number."""
+    with pytest.raises(ValueError, match="not usable with"):
+        inner_donor_folds(["d0", "d1"], 3, seed=1, outer_index=0)
+
+
+def test_smoke_scale_nesting_is_possible_at_all():
+    """A standing check on the tier, not on the code. 8 donors / 2 outer folds leaves 4
+    training donors, so `inner_donor_folds: 2` gives 2 train + 2 validation. This asserts
+    the split is *constructible*; whether cNMF fits usefully on 2 donors is a separate
+    question the runner answers, and if it cannot, that is a finding about SMOKE rather
+    than a reason to quietly lower the fold count."""
+    fold = outer_donor_folds(DONORS, 2, seed=7)[0]
+    assert len(fold.train_donors) == 4
+    inners = inner_donor_folds(fold.train_donors, 2, seed=7, outer_index=0)
+    assert [len(f.train_donors) for f in inners] == [2, 2]
 
 
 def test_panel_partitions_G_exactly():
