@@ -84,6 +84,30 @@ PROVISIONAL = {
             reason="Linear in-process driver. No cache, no restart, no CI, no SLURM.",
             hardening_requires="The P0-07 workflow with restart and cache-invalidation tests.",
         ),
+        ProvisionalComponent(
+            component_id="features.consensus_c",
+            owner_task="P3-01",
+            reason="Feature C reimplements upstream's consensus aggregation harness-side, "
+            "because `cnmf.py` may not be edited. Its OFF path is pinned against "
+            "`cnmf.consensus` by test, but only at the tiers run so far — and the "
+            "tie-breaking rule for which contribution survives (nearest the cluster "
+            "centroid) is a choice this implementation made, not a reading of the "
+            "ablation plan. See D015.",
+            hardening_requires="The OFF-path equivalence asserted at every tier a result "
+            "is claimed at, and the tie-break rule either fixed in the ablation plan or "
+            "shown not to change the C effect.",
+        ),
+        ProvisionalComponent(
+            component_id="features.discovery_sample_b",
+            owner_task="P2-01",
+            reason="Feature B's matched-budget draw. The redistribution rule for donors "
+            "holding fewer cells than their equal share is this implementation's choice, "
+            "and `hold_preprocessing_constant_across_B` is enforced by passing a frozen "
+            "gene list rather than by anything checking that G could not have drifted.",
+            hardening_requires="A cross-arm audit that G, s_g and the panel are identical "
+            "between B-ON and B-OFF, plus sampling replicates so the draw's variance is "
+            "reported rather than assumed negligible.",
+        ),
     ]
 }
 
