@@ -24,7 +24,6 @@ import numpy as np
 from scipy.optimize import nnls
 
 from .contract import ContractViolation
-from .provisional import provisional
 
 __all__ = [
     "training_gene_scale",
@@ -71,7 +70,6 @@ def to_training_scale(counts_on_g, s_g):
     return np.asarray(counts_on_g, dtype=np.float64) / np.asarray(s_g, dtype=np.float64)[None, :]
 
 
-@provisional("scoring.nnls_usages")
 def nnls_usages(x_inference, v_inference):
     """`U[c,:] = argmin_{u>=0} ‖X[c,G_inf] − u·V[:,G_inf]‖²` (§3.3).
 
@@ -81,6 +79,10 @@ def nnls_usages(x_inference, v_inference):
     approximates it and would make the P0-05 leakage test non-bitwise.
 
     `v_inference` is `K × |G_inf|`, so the least-squares design matrix is its transpose.
+
+    Un-fenced at D021: `test_leakage.py` shows perturbing a held-out cell's
+    validation-panel counts leaves its inference-panel usages bitwise unchanged, closing
+    this function's `hardening_requires`.
     """
     x = np.asarray(x_inference, dtype=np.float64)
     v = np.asarray(v_inference, dtype=np.float64)

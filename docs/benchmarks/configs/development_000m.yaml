@@ -39,7 +39,7 @@ validation:
   inner_donor_folds: 2
   inference_gene_fraction: 0.5
   panel_seed: 20260918
-  panel_repetitions: 1
+  panel_repetitions: 5
   projection: nonnegative_least_squares_frozen_dictionary
   transform: training_fitted_and_leakage_audited
 resources:

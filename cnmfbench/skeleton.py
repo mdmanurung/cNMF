@@ -548,6 +548,25 @@ def _run_inner_fold(inner, adata, raw, donors, gene_names, ranks, cfg, fold_dir,
     return scores
 
 
+def _score_with_panel(panel, g_list, raw_test_g, test_donors_all, v_arr, s_g):
+    """The headline held-out loss under ONE panel realisation, in count units.
+
+    Used only to measure between-panel variance. It repeats the scoring path rather than
+    calling into the rank loop because the rank loop also emits rows, and a repetition must
+    not emit any — see the panel-repetition comment in `_run_fold`. The duplication is
+    checked rather than trusted: repetition 0 must reproduce the emitted value exactly, and
+    `_run_fold` asserts that.
+    """
+    inf = np.array([g_list.index(g) for g in panel.inference_genes])
+    val = np.array([g_list.index(g) for g in panel.validation_genes])
+    keep = scoreable_mask(raw_test_g[:, inf])
+    x = to_training_scale(raw_test_g, s_g)[keep]
+    d = test_donors_all[keep]
+    u = nnls_usages(x[:, inf], v_arr[:, inf])
+    return float(equal_donor_mean(
+        count_unit_error(x[:, val], u, v_arr[:, val], s_g[val]), d).value)
+
+
 def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
               fold_dir, dataset_id, prov, density_threshold):
     """One outer fold: fit on training donors only, then score every candidate rank."""
@@ -636,8 +655,31 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
         raw[np.ix_(fit_pos, g_pos)], np.asarray(norm.X), s_g
     )
 
-    panel = gene_panel(g_list, cfg["validation"]["inference_gene_fraction"],
-                       cfg["validation"]["panel_seed"])
+    # ---- panel repetitions (§4.1, and the fence entry that names them) ----
+    #
+    # A repetition re-splits `G` into inference/validation; it does NOT refit anything, so
+    # the whole set costs one NNLS solve per rank per repetition and no cNMF call. Whether
+    # panel variance matters at all has never been measured — the fence entry's earlier
+    # claim that it "was measured to exceed the rank signal" had no artifact behind it and
+    # is corrected in provisional.py. This is where that number gets established.
+    #
+    # **Repetition 0 is the primary and the only one that emits rows.** Two reasons, and
+    # neither is cost. First, §5.2 permits exactly 11 metric names and §5.1 forbids writing
+    # one that is not on the list, so a between-panel variance CANNOT be a metric — it is a
+    # diagnostic. Second, §4.1 requires one panel across the ranks and configurations of a
+    # comparison; emitting rows per repetition would put several panels inside one
+    # comparison and invite exactly the pooling §4.1 tells the harness to refuse.
+    n_reps = int(cfg["validation"].get("panel_repetitions", 1) or 1)
+    panels = [gene_panel(g_list, cfg["validation"]["inference_gene_fraction"],
+                         cfg["validation"]["panel_seed"], repetition=r)
+              for r in range(n_reps)]
+    panel = panels[0]
+    if len({p.mask_id for p in panels}) != n_reps:
+        raise ContractViolation(
+            f"{n_reps} panel repetitions produced {len({p.mask_id for p in panels})} "
+            "distinct mask_ids. Repetitions that collide measure nothing, and their "
+            "variance would be reported as zero rather than as missing."
+        )
     inf_pos = np.array([g_list.index(g) for g in panel.inference_genes])
     val_pos = np.array([g_list.index(g) for g in panel.validation_genes])
 
@@ -669,6 +711,7 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
     diagnostics = [_fold_diagnostics(fold, ds, g_list, g_pos, panel, s_g, obj, ranks,
                                      density_threshold, transform_rel_error, n_excluded,
                                      norm, x_test, inf_pos, val_pos, test_rows[keep])]
+    diagnostics[0]["panel_variance_by_k"] = {}
     results, experiments = [], []
 
     # ---- fit-scope rows: the shared prepare/factorize/combine cost, attributed once ----
@@ -727,6 +770,36 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
         loss_counts = count_unit_error(x_test[:, val_pos], u, v_arr[:, val_pos], s_g[val_pos])
         u_null = nnls_usages(x_test[:, inf_pos], null_v[:, inf_pos])
         loss_null = squared_prediction_error(x_test[:, val_pos], u_null, null_v[:, val_pos])
+
+        # ---- panel-repetition variance, a DIAGNOSTIC never a metric (see the comment above
+        # `panels = [...]`) ----
+        #
+        # Repetition 0's value MUST equal `loss_counts` above exactly: `_score_with_panel`
+        # duplicates the scoring path rather than sharing it, because sharing it would mean
+        # the repeat loop emits rows, which §4.1 and §5.1 both forbid. An unchecked
+        # duplicate is a second implementation quietly drifting from the first, so it is
+        # checked here, at run time, on every fold — the same reasoning
+        # `verify_transform_matches_cnmf` and the C off-path check already use.
+        panel_losses = [_score_with_panel(p, g_list, raw_test_g, donors[test_rows], v_arr, s_g)
+                        for p in panels]
+        rep0 = panel_losses[0]
+        primary = float(equal_donor_mean(loss_counts, test_donors).value)
+        if rep0 != primary:
+            raise ContractViolation(
+                f"panel repetition 0's independently-scored loss ({rep0!r}) differs from "
+                f"the emitted row's value ({primary!r}) at k={k}. The two must be bitwise "
+                "identical because repetition 0 IS the panel the row was scored with; a "
+                "divergence means _score_with_panel has drifted from the emitted path."
+            )
+        panel_variance = {
+            "n_repetitions": n_reps,
+            "values": panel_losses,
+            "mean": float(np.mean(panel_losses)),
+            "sd": float(np.std(panel_losses, ddof=1)) if n_reps > 1 else 0.0,
+            "min": float(np.min(panel_losses)),
+            "max": float(np.max(panel_losses)),
+        }
+        diagnostics[0]["panel_variance_by_k"][int(k)] = panel_variance
 
         # ---- P0-04 metrics. Units are aligned EXPLICITLY (D013) ----
         #

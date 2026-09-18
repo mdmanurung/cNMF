@@ -149,9 +149,12 @@ def inner_donor_folds(outer_fold, n_folds, seed):
     return folds
 
 
-@provisional("splits.gene_panel")
 def gene_panel(gene_labels, inference_gene_fraction, panel_seed, repetition=0):
     """Split `G` into `G_inf ⊔ G_val` (§4.1).
+
+    Un-fenced at D021: `repetition` now feeds a measured between-panel variance
+    (`skeleton.py`'s panel-repetition block) and `analysis.assert_panels_identical`
+    closes the cross-arm audit — this function's `hardening_requires`.
 
     `gene_labels` is `G` in cNMF's `nmf_genes_list` order. The permutation is taken over
     a lexicographically sorted copy so the panel is a pure function of

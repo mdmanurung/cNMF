@@ -23,13 +23,13 @@
 | Baseline selector specification | **SPECIFIED, NOT RUNNABLE.** Equation and all four edge cases frozen in PROTOCOL.md §1/§1.4: `K* = max{K : silhouette(K) ≥ max silhouette − delta}` (largest-among-stable, *not* argmax — see §1.2 for why argmax would rig P1). `delta` is null, so the selector **refuses to run**. Not yet implemented in code (P0-06) |
 | Recommended configuration | None, and none is possible yet — no configuration has been evaluated. `000` is the *reference*, not a recommendation |
 | Latest evidence tier | **DEVELOPMENT** — two runs, 610 + 610 rows and 16 + 16 experiments (the second is the `variant: conv1000` convergence diagnostic), plus 122 + 8 at SMOKE: **1342 / 40** tracked. Configuration `000`, all `status: ok_provisional`, `selected_rank` null throughout. `allow_scientific_promotion: false`, so this informs design and promotes nothing |
-| Last update by implementing agent | Features B/C session, 2026-09-18 |
-| Session checkpoint | S0-01, S0-02, S0-03, P0-01, **P0-03 DONE**, **P0-04 DONE**. Protocol frozen at v1.0.1. P0-06 IN_PROGRESS (spec written, `delta` null, no code). **192 harness tests pass; 4430 + 136 rows tracked.** Features B and C are independently switchable harness-side switches (`cnmfbench/features.py`), with C's OFF path pinned bitwise against `cnmf.consensus` at run time and by test. The four A-OFF factorial cells 000/001/010/011 are run at SMOKE and DEVELOPMENT. **SMOKE was shown incapable of exercising C**; at DEVELOPMENT C fires 27-41 times but **only above K_true**, where it is a small consistent degradation (12/12 on recovery) that does NOT scale with how often it fires. **D016: `hold_preprocessing_constant_across_B` holds for `G` and cannot hold for `s_g`** — the sign of the B effect flipped in 4 of 6 SMOKE cells between unit conventions, so cross-arm endpoints are now read in count units, pre-registered in `contracts/B.md` before any DEVELOPMENT row was read. The feasibility NO-GO stands. **Six** components remain fenced (`cnmfbench/provisional.py`, D011; `scoring.equal_donor_mean` un-fenced at D017 once its own battery was written) and the P0 gate cannot close until they are hardened |
+| Last update by implementing agent | P0-05 session, 2026-09-18 |
+| Session checkpoint | S0-01, S0-02, S0-03, P0-01, **P0-03 DONE**, **P0-04 DONE**, **P0-05 DONE**. Protocol frozen at v1.0.1. P0-06 IN_PROGRESS (spec written, `delta` null, no code). **229 harness tests pass; tracked rows unchanged from the P0-04 session (verified by rerun-and-diff, see D021).** Nested donor folds (`inner_donor_folds`) and the §3.2 leakage audit (`test_leakage.py`, `test_inner_folds.py`) are implemented and run against real cNMF fits, but D019 establishes the inner loop runs only when feature A is on — reversing the approved plan's §6.2 before any A-ON run existed to be confounded by it. Panel repetitions and the cross-arm `assert_panels_identical` audit close two more fence entries (D021); **fence goes six → four**, `splits.outer_donor_folds` reassigned P0-05 → P0-06 rather than un-fenced (its nesting exists and is tested, but has no production caller until `delta` is set). D020 defers the inner-budget-under-`matched_budget` sampling design to P0-06, fully specified but not implemented, since feature A cannot run regardless. D022 corrects an unsourced claim in the `splits.gene_panel` fence entry; the number it stands in for is now measured (SMOKE panel-repetition sd is 13-19% of mean loss). Features B and C remain independently switchable harness-side (`cnmfbench/features.py`), with C's OFF path pinned bitwise against `cnmf.consensus`. The four A-OFF factorial cells 000/001/010/011 are run at SMOKE and DEVELOPMENT; the feasibility NO-GO stands |
 
 ## 2. Progress counts
 
-**6 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04).  
-TODO: 24 · IN_PROGRESS: 1 (P0-06 — selector specification frozen in PROTOCOL.md §1, but `delta` is null and no code exists) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
+**7 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05).  
+TODO: 23 · IN_PROGRESS: 1 (P0-06 — selector specification frozen in PROTOCOL.md §1, but `delta` is null and no code exists) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
 
 Scientific adoption remains separate and untouched. P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance; S0-03 establishes the rules by which future evidence will be judged; the skeleton establishes that the loop executes end to end. **None of that is evidence for any feature.** Benchmark numbers now exist, but only at SMOKE tier, from fenced throwaway components, for the reference configuration `000` — there is nothing to compare them against, and `smoke_can_promote_feature: false` forbids using them if there were.
 
@@ -64,7 +64,7 @@ Update status and evidence after each meaningful code/test batch. A task is DONE
 | P0-02 | P0 | Implement data/artifact schemas, orientation and provenance checks | P0-01 | TODO | Schema tests; manifest examples; explicit expression units — **not yet available** |
 | P0-03 | P0 | Implement simulator, scenario registry and data tiers | P0-02 (**inverted — see D006**; implements PROTOCOL.md §6 instead) | **DONE** | `cnmfbench/` — simulator, scenario registry (8 specified, 3 implemented), §6 contract checks, §7 hashing, `.h5ad` io with hash verification, diagnostics. Saved truth, independent realizations and the sealed-manifest policy implemented and tested. Donor structure **measured**: blocked-vs-random CV gap real (+2.9%, t=3.10, n=48) but the mechanism is donor count, not per-donor leakage (`registry/p0-03_donor_eligibility_sweep.tsv`, D008). All three feasibility checks run (`registry/p0-03_feasibility_checks.tsv`). 122 harness tests pass |
 | P0-04 | P0 | Implement four headline metrics and corruption/invariance tests | P0-03 | **DONE** | `cnmfbench/recovery.py` + `compare.py`; 29 + 9 tests. `program_recovery_cosine_v1` (Hungarian, dummy factors, unit-tagged `Spectra` that refuses an unaligned comparison — D013) and `usage_error_v1` (reuses the alignment object, refuses one from a different fit). Full corruption battery: three invariances asserted to 1e-12, four penalties asserted. `program_precision_v1`/`program_recall_v1` and the `ambiguous` count implemented **and refusing**, thresholds null per §5.2. D004's two obligations discharged. **Wired into the runner**: both metrics write rows at `evaluation_scope: experiment` with the matched null beside them in `EXPERIMENTS.notes` (never a twelfth metric name, §5.1). Exercised over 8 runs at two tiers; recovery peaks at `K_true` in every fold and configuration. `registry/p0-04_features_bc_smoke.tsv`, `registry/p0-04_features_bc_development.tsv` |
-| P0-05 | P0 | Implement donor splits, frozen-panel projection and leakage tests | P0-02, P0-04 | TODO | Nested split proof; masked projection tests; normalization leakage tests — **not yet available** |
+| P0-05 | P0 | Implement donor splits, frozen-panel projection and leakage tests | P0-02, P0-04 | **DONE** | Nested split proof: `splits.inner_donor_folds` + `test_inner_folds.py` (8 tests against real cNMF fits, bitwise invariance under perturbed inner-validation donors, positive control, refusal of a leaked outer-test donor). Masked projection / leakage tests: `test_leakage.py` (9 tests — `G`, `s_g`, dictionary, cache identities, stability curve and inference-panel usages all bitwise invariant to perturbed held-out counts; same-input gate; positive control). Normalization leakage tested explicitly (`test_a_held_out_cells_library_total_cannot_reach_its_inference_usages`). Panel repetitions + variance reported (`skeleton.py`'s `panel_variance_by_k`) and the cross-arm `analysis.assert_panels_identical` audit, closing `splits.gene_panel`'s and `scoring.nnls_usages`'s fence entries (D021). **Deviation recorded** (D021, extending D018): P0-02 remains TODO. **Deferred to P0-06** (D020): the inner-budget-under-`matched_budget` sampling design — specified in full but not implemented, since feature A cannot run until `delta` is set regardless |
 | P0-06 | P0 | Preregister training-only baseline rank selection and evaluation protocol | P0-04, P0-05 | IN_PROGRESS | **Specification half done at S0-03.** The selector equation, its sensitivity heuristic, and all four required edge cases (ties, degenerate/flat curve, search boundary, failed/NaN K) are written and frozen in PROTOCOL.md §1 and §1.4. **Remaining:** (a) `delta` is null and the selector must refuse to run while it is — calibration procedure frozen in §2, value set on development controls at the start of P1, creating protocol v1.1; (b) no implementation in code yet. Do not mark DONE until both are closed |
 | P0-07 | P0 | Implement smoke workflow, CI, cache/restart and local/SLURM profiles | P0-05 | TODO | End-to-end smoke; cache/restart tests; explicit SLURM status — **not yet available** |
 | P0-08 | P0 | Register a public multi-donor dataset and verify metadata | P0-02 | TODO | Accession/source, license, checksum and donor mapping; or external blocker — **not yet available** |
@@ -414,7 +414,7 @@ Several were measured against the real data and changed decisions rather than wo
 #### Status transitions made
 
 - **P0-03: IN_PROGRESS → DONE.** Acceptance evidence complete: saved truth, independent realizations, sealed-manifest policy, and all three feasibility checks run
-- P0 gate: software status **PASS (smoke only)**, evidence tier **SMOKE**, scientific adoption **NOT_APPLICABLE**. The gate cannot close while five components are fenced
+- P0 gate: software status **PASS (smoke only)**, evidence tier **SMOKE**, scientific adoption **NOT_APPLICABLE**. The gate cannot close while components remain fenced — **four** as of D021 (§"Four components are fenced" below is authoritative; this line described six components at P0-04 and is left as a historical status note, not updated to track the current count)
 
 #### Blockers still open
 
@@ -436,26 +436,28 @@ Editing it is not a normal edit. Any change to a frozen rule creates a **new pro
 
 Two constants are **null by design** and stay null until P1: `delta` (the baseline selector's stability tolerance, §2) and the precision/recall threshold (§5.2). Both make their consumer **refuse to run** rather than fall back to a default. Do not "fix" this by supplying a default — that would be choosing a constant after seeing the data. Their calibration procedure is already frozen in §2.
 
-### The next task is P0-05: nested donor folds and the leakage suite
+### The next task is P0-06: the selector and `delta`
 
-P0-04 is **DONE**. The loop `simulate -> split -> real cNMF -> frozen-dictionary NNLS -> equal_donor_mean -> rows` runs end to end, both recovery metrics are wired into the runner, and the four A-OFF configurations have run at SMOKE and DEVELOPMENT (4430 + 136 tracked rows, 199 tests, exit 0).
+P0-05 is **DONE**. Nested donor folds, the §3.2 leakage audit, panel repetitions and the cross-arm panel-identity audit are all implemented and tested against real cNMF fits (`test_leakage.py`, `test_inner_folds.py`, `test_records_and_fence.py`). The fence went six → four (D021); `splits.outer_donor_folds` was reassigned to P0-06 rather than un-fenced (D021) because its nested-fold path has no production caller until `delta` is set. **229 tests pass, exit 0.**
 
-P0-05 is blocking two things at once:
+**What P0-06 must do**, per `PROTOCOL.md:159-174` (§2), mechanically and in this order:
 
-1. **Feature A cannot exist without it.** A is inner-validation rank selection. `outer_donor_folds` produces outer folds only; `inner_split_id` is a schema column that has never been populated; the fence says so directly — *"Outer folds only. No nested inner folds, so no rank selection is possible."*
-2. **It owns three of the six fenced components** — `splits.outer_donor_folds`, `splits.gene_panel`, `scoring.nnls_usages`. Completing it halves the fence.
+1. DEVELOPMENT-tier controls only; sealed data and every outer-test fold excluded.
+2. Silhouette curves across the grid on `base_identifiable` **and** `A_weak` — both implemented (`scenarios.py:127-146`).
+3. `delta` from the **within-scenario dispersion of silhouette across optimizer seeds** — the noise scale, not the between-K scale.
+4. Record curves, dispersion and value in DECISIONS **before** checking which K the value selects.
+5. Never adjust using true rank or any outer-test result.
 
-**What it must make true.** PROTOCOL §3.2 names the transform `training_fitted_and_leakage_audited` and then says (`PROTOCOL.md:231-233`) that *"leakage audited" means the claim is tested, not asserted*. Only the first half of that name is earned today: the one existing leakage test (`test_splits_and_scoring.py:253`) is synthetic — no cNMF fit, no `G`, no `s_g`, no dictionary — and its own docstring calls it *"a down payment on P0-05"*.
+**The A-headroom finding is already pre-registered** (see the approved plan, §7): on the DEVELOPMENT runs already in hand (`results/exploratory/p04-dev-000m/diagnostics.json`), every `delta` in `[0.0011, 0.0714)` selects `K* = 7 = K_true` in both outer folds — a 66x window. The A-OFF baseline is therefore predicted to already find the true rank on `base_identifiable`, so A's headroom is on `A_weak`/`A_null`, not there. This was written down before `delta` is computed so a null A result on `base_identifiable` is a predicted outcome, not grounds to retune the tier.
 
-Three traps are already known:
+**Two known traps for P0-06:**
 
-- **`PROTOCOL.md` contains no nested-fold section and no definition of `inner_split_id`.** The requirement lives only in `IMPLEMENTATION_PROMPT.md:160-173` and `ablation_plan.yaml:55` (`nested_donor_folds: true`). Implementing it is not a protocol amendment — §9 versions changes to rules PROTOCOL *states*, and it states none here — but `inner_split_id`'s meaning should be batched into the v1.1 amendment rather than left only in code.
-- **A leakage test that perturbs held-out cells *after* the split proves nothing.** The training-only `.h5ad` never contained them, so the test passes vacuously. Perturb the dataset before `prepare`. And include the positive control: perturbing outer-test values **must** change that fold's score, or a pipeline ignoring held-out data entirely would pass every invariance.
-- **SMOKE may not support nesting.** 8 donors, 2 outer folds → 4 training donors per outer fold, so `inner_donor_folds: 2` leaves 2 donors to fit an inner dictionary. If that is degenerate, record it as a finding — the same shape as *"SMOKE cannot test feature C"* — rather than quietly lowering `n_folds` until it runs.
+- **`splits.outer_donor_folds` stays fenced until A actually runs in production**, not merely until it is switchable in code (D021). Un-fencing it the moment `check_preconditions` stops refusing A would repeat exactly the reasoning D021 avoided.
+- **The inner-budget-under-`matched_budget` sampling design is deferred and fully specified at D020**, not implemented. Before any A-ON `matched_budget` configuration (`100/101/110/111`) can run, D020's eight sub-problems need resolving — most load-bearing: `make_experiment_id` has no `inner_split_id` slot, so two inner folds of one outer fold at one rank collide on `experiment_id` today, and that collision must be resolved before any inner row can be written, independent of the sampling arithmetic.
 
-The config surface already exists and is ignored: every config declares `inner_donor_folds` and `panel_repetitions`, and nothing reads either.
+`delta` is one of seven items batched into the single protocol v1.1 amendment (approved plan §7 lists all seven) — do not version PROTOCOL twice.
 
-Then P0-06 (the selector and `delta`), the P0 gate, then P1/A. The user's target is the first `000` vs `100` comparison. Approved plan: `/home/mdmanurung/.claude/plans/plan-the-next-steps-warm-tome.md`.
+Then the P0 gate, then P1/A. The user's target is the first `000` vs `100` comparison. Plan: `/home/mdmanurung/.claude/plans/plan-the-next-steps-warm-tome.md`.
 
 ### Session 2026-09-17/18 — the feasibility gate, its NO-GO, and P0-04's metrics (Claude Code)
 
@@ -503,6 +505,38 @@ Then P0-06 (the selector and `delta`), the P0 gate, then P1/A. The user's target
 - Exact next command: `python -m pytest cnmfbench -q` to confirm 178 green, then edit `cnmfbench/skeleton.py`'s per-rank block to score recovery against `ds.true_spectra` restricted to the fold's `G`, aligned with `.to_scaled(s_g)`, with `matched_null_spectra` beside it
 
 
+### Session 2026-09-18b — P0-05: nested folds, the leakage audit, and un-fencing (Claude Code)
+
+- Starting task and code revision: continue the approved plan (`plan-the-next-steps-warm-tome.md`) from `328238e` (harness) / `5dbc5ba` (upstream). `src/cnmf/**` unmodified throughout, re-verified byte-identical after every commit
+- Environment: `module load tools/miniconda/python3.10/23.3.1 && source activate cnmf_bench`, `OMP_NUM_THREADS=OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=1`
+
+**Commands run, with outcomes:**
+
+| command | outcome |
+|---|---|
+| `python -m pytest cnmfbench -q` (repeated after each batch below) | exit 0 throughout — 225 passed at session start (`7312dd2`), 229 passed at session end |
+| `python -m cnmfbench.skeleton --config docs/benchmarks/configs/smoke_000m.yaml --run-id refactor_check` | exit 0; all 102 non-cost tracked rows reproduced exactly after extracting `_consensus_dictionary` and wiring the inner loop |
+| `python -m cnmfbench.skeleton --config docs/benchmarks/configs/smoke_000m.yaml --run-id panel_check` (with `panel_repetitions: 5`) | exit 0; same 102 rows reproduced exactly; `panel_variance_by_k` sd/mean 12.6-19.5% across `k=2,3,4`, both outer folds |
+| `git diff 5dbc5ba..HEAD --stat -- src/ tests/ setup.py pyproject.toml` (repeated) | empty throughout |
+
+Both verification runs' directories were deleted after comparison (`rm -rf results/exploratory/{refactor_check,panel_check}`), not committed.
+
+**§6.2 of the approved plan was reversed before any code built on it (D019).** The plan said the inner validation loop runs unconditionally for every configuration. `PROTOCOL.md:48` (§1.1) shows the A-OFF baseline selector reads `silhouette`/`prediction_error` from the training fit's own `k_selection_stats`, never from an inner fold — so `_run_inner_fold` is called only when feature A is on. `check_preconditions` still refuses A while `delta` is null, so this has no effect on any tracked row yet; it is recorded so the `000`-vs-`100` comparison is not confounded the day A is switched on.
+
+**Nested folds, real fits, both failure modes checked (`7312dd2`).** `splits.inner_donor_folds` (already implemented pre-session) plus a new `test_inner_folds.py`, 8 tests run against real `prepare/factorize/combine/consensus`: clobbering (an inner fit cannot overwrite its outer fold's `nmf_genes_list`), and leakage one level down (perturbing inner-validation donors leaves the inner `G`/`s_g`/dictionary bitwise unchanged, and the inner score DOES move). `_consensus_dictionary` extracted from `_run_fold` so the inner loop applies feature C identically to the outer loop.
+
+**Panel repetitions and the cross-arm audit (D021, D022).** `skeleton.py` now draws `panel_repetitions` gene-panel realisations per fold, scores each independently (`_score_with_panel`), and asserts repetition 0 reproduces the emitted row's value exactly — a duplicate scoring path checked at run time rather than trusted. The variance is recorded as a diagnostic (`panel_variance_by_k`), never a metric, per §5.1/§5.2. `analysis.assert_panels_identical` closes the §4.1 audit the fence named and nothing implemented; verified against the tracked evidence (`test_panel_identity_holds_within_the_tracked_evidence_per_outer_fold`). The `splits.gene_panel` fence entry's unsourced claim ("measured to exceed the rank signal") is corrected — no artifact ever backed it — and replaced with the number this session actually measured (D022).
+
+**Fence: six → four (D021).** `splits.gene_panel` and `scoring.nnls_usages` un-fenced, both `hardening_requires` met. `splits.outer_donor_folds` reassigned P0-05 → P0-06 rather than un-fenced with them: its nesting exists and is tested, but D019 means no production run calls it yet, and un-fencing it now would repeat D017's exact lesson.
+
+**Inner-budget-under-`matched_budget` sampling deferred, fully specified (D020).** A design review (run against the user's already-chosen fix — scale the inner budget to the inner cell fraction) found the fix's execution has eight interacting sub-problems: arm-based branching (not B's bit), `s_g` computed on sampled rows (a latent bug the review caught before it could ship), a required inner `_panelref` for B, cells-not-donors scaling, per-fold seed derivation, two new `check_preconditions` checks, cost-window separation, and an `experiment_id` collision with no chosen resolution. Deferred to P0-06 rather than rushed, since feature A cannot run in production regardless — see D020 for the full specification.
+
+**Record corrections.** `PROGRESS.md`'s fence table, resume block and progress counts updated to 7/31 DONE; a stale "five components" sentence from the P0-03 session (`:417`) corrected; a third dependency-order deviation (P0-05 DONE while P0-02 remains TODO) recorded per D018's established pattern, in D021.
+
+- Decisions recorded: **D019** (inner loop conditional on A), **D020** (inner-budget design deferred to P0-06), **D021** (un-fencing + reassignment), **D022** (unsourced panel-variance claim corrected)
+- Next task: **P0-06** — the selector and `delta`. See the resume block above for the mechanical procedure and the two known traps.
+
+
 ### Session 2026-09-18 — real data, then features B and C (Claude Code)
 
 Two sessions' work, logged together because neither was logged at the time.
@@ -543,24 +577,22 @@ Findings, in order of how much they change what is believed:
 - Status transitions: **P0-04 IN_PROGRESS → DONE** (6/31). Fence 7 → 6. Decisions added: D015 (C's tie-break rule, previously referenced from two files and never written), D016, D017.
 - Next action: **P0-05** — nested donor folds and the leakage suite.
 
-### Six components are fenced as throwaway, and the P0 gate reads the fence
+### Four components are fenced as throwaway, and the P0 gate reads the fence
 
 `cnmfbench/provisional.py` lists, with its owning ledger task and what hardening requires (D011):
 
 | component | owner | what hardening requires, in brief |
 |---|---|---|
-| `splits.outer_donor_folds` | P0-05 | nested outer/inner donor folds |
-| `splits.gene_panel` | P0-05 | panel repetitions with variance reported, + cross-arm panel-identity audit |
-| `scoring.nnls_usages` | P0-05 | the §3.2 leakage tests |
+| `splits.outer_donor_folds` | **P0-06** | `delta` set and feature A runnable, so the nested-fold path (already built and tested against real cNMF fits) is exercised by a production run rather than by tests alone |
 | `skeleton.run` | P0-07 | workflow with restart and cache-invalidation tests |
 | `features.consensus_c` | **P3-01** | OFF-path equivalence at every tier claimed, + the tie-break rule settled (D015) |
 | `features.discovery_sample_b` | **P2-01** | sampling replicates so the draw's variance is reported (D016) |
 
 Every row they produce carries `status: ok_provisional`.
 
-`scoring.equal_donor_mean` was **un-fenced at D017** once its own corruption/invariance battery was written; earlier copies of this section still list it and are wrong. The code is authoritative.
+`scoring.equal_donor_mean` was **un-fenced at D017** once its own corruption/invariance battery was written. `splits.gene_panel` and `scoring.nnls_usages` were **un-fenced at D021** (P0-05): panel repetitions with variance reported plus the cross-arm `assert_panels_identical` audit close the first; the §3.2 leakage suite (`test_leakage.py`) closes the second. `splits.outer_donor_folds` was reassigned from P0-05 to P0-06 at the same decision rather than un-fenced with them — see D021 for why. Earlier copies of this section naming five or six components, or listing `scoring.equal_donor_mean`, `splits.gene_panel` or `scoring.nnls_usages` as still fenced, are wrong. The code is authoritative.
 
-**A structural problem, named not solved:** two of the six are owned by *post-P0* tasks, so "the P0 gate cannot close until the fence is empty" currently makes P0 depend on P2-01 and P3-01. Either the gate condition is scoped to P0-owned components, or the P0 gate genuinely cannot close before P3. This wants a decision before `gates/P0.md` is written.
+**A structural problem, named not solved:** two of the four are owned by *post-P0* tasks, so "the P0 gate cannot close until the fence is empty" currently makes P0 depend on P2-01 and P3-01. Either the gate condition is scoped to P0-owned components, or the P0 gate genuinely cannot close before P3. This wants a decision before `gates/P0.md` is written.
 
 `registry_is_empty()` is the gate check and is **false** today. Emptying it means deleting decorators and registry entries together, in a commit with a decision entry. Do not "tidy" the registry without doing the hardening it names.
 

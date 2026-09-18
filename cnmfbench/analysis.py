@@ -14,7 +14,12 @@ was anything that *used* it. That is all this module is.
 """
 import csv
 
-__all__ = ["PoolingError", "load_rows", "assert_poolable", "pooling_groups"]
+from .records import NOT_COMPUTED
+
+__all__ = [
+    "PoolingError", "load_rows", "assert_poolable", "pooling_groups",
+    "assert_panels_identical",
+]
 
 
 class PoolingError(ValueError):
@@ -94,6 +99,60 @@ def pooling_groups(rows, experiments):
     for r in rows:
         groups.setdefault(lookup.get(r["experiment_id"], "UNKNOWN"), []).append(r)
     return groups
+
+
+def _mask_id_by_experiment(experiments):
+    return {e["experiment_id"]: e.get("mask_id", "") for e in experiments}
+
+
+def assert_panels_identical(rows, experiments):
+    """Raise unless every row's experiment shares one `mask_id` (PROTOCOL §4.1).
+
+    §4.1: "Panels are identical across all candidate ranks and all A/B/C configurations
+    within a comparison... the harness must refuse such a comparison rather than report
+    it." `assert_poolable` catches a panel difference only indirectly, as a
+    `preprocessing_hash` mismatch that could equally be a different `s_g` or a different
+    `num_highvar_genes` — this names the panel specifically, by the one column built to
+    identify it: `splits.py:11-14` records that `mask_id` "hashes the realised panel, not
+    the seed" for exactly this reason.
+
+    Call this on the rows of ONE comparison — e.g. every rank of configurations `000` and
+    `100` at one outer fold — not on a whole `RESULTS.tsv`. `mask_id` legitimately differs
+    across DIFFERENT outer folds (`G` is refit per fold from that fold's own training
+    donors) and between an outer fold and its inner folds (`skeleton.py`'s
+    `_run_inner_fold` docstring records why that is not a §4.1 violation). Scoping which
+    rows form one comparison is the caller's job, the same way it is `assert_poolable`'s.
+
+    Rows whose experiment has no computed panel — fit-scope and failed rows, which carry
+    `mask_id=NOT_COMPUTED` — are skipped rather than treated as a mismatch: they carry no
+    panel to compare, and counting `NOT_COMPUTED` as a value would make every comparison
+    that includes a fit-scope row falsely look like it spans two panels.
+    """
+    lookup = _mask_id_by_experiment(experiments)
+    missing = sorted({r["experiment_id"] for r in rows} - set(lookup))
+    if missing:
+        raise PoolingError(
+            f"{len(missing)} row(s) reference an experiment_id absent from EXPERIMENTS.tsv, "
+            f"first {missing[0]}. Provenance cannot be checked, so the comparison is refused."
+        )
+    by_mask = {}
+    for r in rows:
+        mid = lookup[r["experiment_id"]]
+        if not mid or mid == NOT_COMPUTED:
+            continue
+        by_mask.setdefault(mid, set()).add(r["experiment_id"])
+    if len(by_mask) > 1:
+        detail = "; ".join(
+            f"{mid}: {sorted(ids)[0]}" + (f" (+{len(ids)-1} more)" if len(ids) > 1 else "")
+            for mid, ids in sorted(by_mask.items())
+        )
+        raise PoolingError(
+            f"rows span {len(by_mask)} distinct mask_id values, so they were scored on "
+            f"DIFFERENT gene panels. PROTOCOL §4.1 requires one panel across the ranks and "
+            f"configurations of a comparison, so this comparison is refused rather than "
+            f"reported. {detail}"
+        )
+    return True
 
 
 # ---------------------------------------------------------------- the feasibility gate

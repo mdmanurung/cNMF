@@ -52,25 +52,16 @@ PROVISIONAL = {
     for c in [
         ProvisionalComponent(
             component_id="splits.outer_donor_folds",
-            owner_task="P0-05",
-            reason="Outer folds only. No nested inner folds, so no rank selection is possible.",
-            hardening_requires="Nested outer/inner donor folds per IMPLEMENTATION_PROMPT.md:160-173.",
-        ),
-        ProvisionalComponent(
-            component_id="splits.gene_panel",
-            owner_task="P0-05",
-            reason="Single panel realisation (panel_repetitions: 1). Panel variance is "
-            "unmeasured and was measured to exceed the rank signal.",
-            hardening_requires="Panel repetitions with the variance reported, and a "
-            "cross-arm panel-identity audit.",
-        ),
-        ProvisionalComponent(
-            component_id="scoring.nnls_usages",
-            owner_task="P0-05",
-            reason="No leakage audit. PROTOCOL §3.2 calls the transform "
-            "'training_fitted_and_leakage_audited'; only the first half is true today.",
-            hardening_requires="The §3.2/P0-05 leakage tests: perturbing held-out values "
-            "must leave G, s_g, the dictionary and inference-panel usages unchanged.",
+            owner_task="P0-06",
+            reason="Reassigned from P0-05 at D021. The nesting this entry originally "
+            "required now exists (`inner_donor_folds`), is property-tested, and is "
+            "exercised against real cNMF fits in `test_inner_folds.py`. But no production "
+            "run calls it: `check_preconditions` refuses feature A while `delta` is null "
+            "(§2), so the inner loop's only caller today is the test suite. Un-fencing it "
+            "here would repeat D017 — a component declared hardened while the path that "
+            "would exercise it in production does not run.",
+            hardening_requires="`delta` set (P0-06) and feature A runnable, so the inner "
+            "loop is exercised by a real run rather than by tests alone.",
         ),
         ProvisionalComponent(
             component_id="skeleton.run",

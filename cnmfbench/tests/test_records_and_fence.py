@@ -264,12 +264,15 @@ def test_every_provisional_component_names_a_real_ledger_task():
 
 
 def test_calling_a_provisional_component_records_it():
-    from cnmfbench.splits import gene_panel
+    """`splits.gene_panel` and `scoring.nnls_usages` were un-fenced at D021, so a still-
+    fenced component is needed to exercise this. `outer_donor_folds` remains fenced,
+    reassigned to P0-06."""
+    from cnmfbench.splits import outer_donor_folds
 
     P.reset_touched()
     assert P.touched() == ()
-    gene_panel([f"g{i}" for i in range(10)], 0.5, 1)
-    assert "splits.gene_panel" in P.touched()
+    outer_donor_folds([f"d{i}" for i in range(8)], 2, 1)
+    assert "splits.outer_donor_folds" in P.touched()
 
 
 def test_cited_rows_check_is_scoped_not_a_whole_file_scan():
@@ -347,6 +350,75 @@ def test_pooling_guard_refuses_rows_with_no_provenance():
 
     with pytest.raises(PoolingError, match="absent from EXPERIMENTS"):
         assert_poolable([{"experiment_id": "ghost"}], [])
+
+
+# ----------------------------------------------------------- the §4.1 panel-identity audit
+
+
+def test_a_comparison_spanning_two_mask_ids_is_refused():
+    """PROTOCOL §4.1: 'the harness must refuse such a comparison rather than report it.'
+    `assert_poolable` would catch this only indirectly, as a `preprocessing_hash`
+    difference that could equally mean a different s_g or num_highvar_genes — this names
+    the panel specifically."""
+    from cnmfbench.analysis import PoolingError, assert_panels_identical
+
+    experiments = [
+        {"experiment_id": "e1", "mask_id": "panelA"},
+        {"experiment_id": "e2", "mask_id": "panelB"},
+    ]
+    rows = [{"experiment_id": "e1"}, {"experiment_id": "e2"}]
+    with pytest.raises(PoolingError, match="DIFFERENT gene panels"):
+        assert_panels_identical(rows, experiments)
+    assert assert_panels_identical(rows[:1], experiments)
+
+
+def test_fit_scope_rows_with_no_computed_panel_do_not_trip_the_audit():
+    """Fit-scope and failed rows carry `mask_id=NOT_COMPUTED` (`skeleton.py`). Counting
+    that as a distinct panel would make every comparison that includes one falsely look
+    like it spans two panels — the same reason `assert_poolable` skips rows it cannot
+    place, but stated for this check specifically since NOT_COMPUTED is not simply absent."""
+    from cnmfbench.analysis import assert_panels_identical
+
+    experiments = [
+        {"experiment_id": "fit", "mask_id": "NOT_COMPUTED"},
+        {"experiment_id": "rank2", "mask_id": "panelA"},
+        {"experiment_id": "rank3", "mask_id": "panelA"},
+    ]
+    rows = [{"experiment_id": "fit"}, {"experiment_id": "rank2"}, {"experiment_id": "rank3"}]
+    assert assert_panels_identical(rows, experiments)
+
+
+def test_panel_identity_holds_within_the_tracked_evidence_per_outer_fold():
+    """Measured against the tracked rows: within one outer fold (where one `prepare` call
+    serves every candidate rank by construction, `skeleton.py`'s own comment on the fit
+    row), every configuration's ranked rows must share one mask_id."""
+    from cnmfbench.analysis import assert_panels_identical
+
+    rows, experiments = _tracked("RESULTS.tsv"), _tracked("EXPERIMENTS.tsv")
+    if not rows:
+        pytest.skip("no rows written yet")
+    # Scoped to (dataset_manifest_hash, outer_split_id): `outer_0` is reused across
+    # SMOKE, DEVELOPMENT and every simulation replicate, and those are different
+    # datasets with independently-fit gene panels — grouping by outer_split_id alone
+    # would mix runs that were never meant to be one comparison.
+    by_fold = {}
+    for e in experiments:
+        key = (e.get("dataset_manifest_hash", ""), e.get("outer_split_id", ""))
+        by_fold.setdefault(key, []).append(e["experiment_id"])
+    ranked_rows = [r for r in rows if r.get("candidate_rank")]
+    for (dataset_hash, fold), ids in by_fold.items():
+        if not fold:
+            continue
+        fold_rows = [r for r in ranked_rows if r["experiment_id"] in set(ids)]
+        if fold_rows:
+            assert assert_panels_identical(fold_rows, experiments)
+
+
+def test_panel_audit_refuses_rows_with_no_provenance():
+    from cnmfbench.analysis import PoolingError, assert_panels_identical
+
+    with pytest.raises(PoolingError, match="absent from EXPERIMENTS"):
+        assert_panels_identical([{"experiment_id": "ghost"}], [])
 
 
 def test_a_variant_changes_the_id_and_its_absence_leaves_every_existing_id_untouched():
