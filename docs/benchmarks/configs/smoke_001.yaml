@@ -1,0 +1,55 @@
+# Configuration 001. Feature C ON: one contribution per run per upstream cluster.
+# Derived from smoke.yaml; only `features` and `discovery` differ.
+#
+# Carries the SAME matched_budget arm as 000/010/011. An earlier version of this file
+# left it on the full training pool, which would have made the 000-vs-001 contrast a
+# comparison across two different arms -- C's effect confounded with how many cells each
+# side factorized. All four cells of the A-OFF factorial must share the arm or the
+# factorial is not a factorial.
+schema_version: 1
+profile: smoke
+evidence_tier: SMOKE
+allow_scientific_promotion: false
+seed: 1701
+scenario: base_identifiable
+simulation:
+  donors: 8
+  cells_per_donor: 30
+  genes: 180
+  true_programs: 3
+  observation_model: poisson
+  independent_replicates: 1
+factorization:
+  backend: pinned_upstream_cnmf
+  loss: frobenius
+  candidate_ranks:
+  - 2
+  - 3
+  - 4
+  optimizer_starts: 5
+  max_optimizer_iterations: 300
+  num_highvar_genes: 100
+  density_threshold: 2.0
+validation:
+  outer_donor_folds: 2
+  inner_donor_folds: 2
+  inference_gene_fraction: 0.5
+  panel_seed: 20260917
+  panel_repetitions: 1
+  projection: nonnegative_least_squares_frozen_dictionary
+  transform: training_fitted_and_leakage_audited
+resources:
+  cores: 2
+  blas_threads_per_job: 1
+  memory_limit_mb: 4096
+features:
+  A: false
+  B: false
+  C: true
+source_pins:
+  cnmf_full_commit_sha: 5dbc5baaa0b9079b55bce554d801caa235a50457
+  genenmf_full_commit_sha: null
+discovery:
+  arm: matched_budget
+  cell_budget: 72
+  sampling_seed: 424242

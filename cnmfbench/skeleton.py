@@ -54,11 +54,38 @@ from .scoring import (
     count_unit_error, equal_donor_mean, null_dictionary, nnls_usages, scoreable_mask,
     squared_prediction_error, to_training_scale, training_gene_scale,
 )
+from .features import consensus_spectra_from_bank, discovery_sample
+from .recovery import Spectra, matched_null_spectra, recovery_cosine, usage_error
 from .simulate import simulate
 from .splits import gene_panel, outer_donor_folds
 
+# Kept as the defaults the first 1342 rows were written under. The live values come from
+# `_configuration` / `_arm`, so a feature switch is visible in the record rather than
+# implied by which code path ran.
 ARM_ID = "full_training_pool"
 CONFIGURATION = "000"
+
+
+def _bit(cfg, name):
+    return "true" if (cfg.get("features") or {}).get(name) else "false"
+
+
+def _configuration(cfg):
+    """The three-bit id, in the ablation plan's A/B/C order."""
+    f = cfg.get("features") or {}
+    return f"{int(bool(f.get('A')))}{int(bool(f.get('B')))}{int(bool(f.get('C')))}"
+
+
+def _arm(cfg):
+    """`full_training_pool` uses every training cell; `matched_budget` draws a fixed
+    number so that B-ON and B-OFF are compared at equal sample size. The distinction is
+    load-bearing: labelling the full pool `matched_budget` would confound B with how many
+    cells each arm saw, which a test in test_records_and_fence.py already guards."""
+    return (cfg.get("discovery") or {}).get("arm", "full_training_pool")
+
+
+def _cell_budget(cfg):
+    return (cfg.get("discovery") or {}).get("cell_budget")
 
 
 def _utc():
@@ -154,10 +181,35 @@ def check_preconditions(cfg, ablation):
         )
     if ablation["scientific_gates"]["smoke_can_promote_feature"] is not False:
         raise ContractViolation("smoke_can_promote_feature must be false")
-    if any(cfg["features"].values()):
-        raise ContractViolation(f"features must all be off for {CONFIGURATION}: {cfg['features']}")
-    if CONFIGURATION not in ablation["matched_budget_factorial"]["fixed_rank_configurations"]:
-        raise ContractViolation(f"{CONFIGURATION} is not a fixed-rank configuration")
+    config = _configuration(cfg)
+    # Feature A needs a rank SELECTOR, and both of its arms do: the A-ON arm selects by
+    # donor-blocked predictive error, and the A-OFF baseline selects by the silhouette
+    # surrogate, whose tolerance `delta` PROTOCOL §2 leaves null and requires to refuse.
+    # B and C carry no null constant, which is why they are runnable now and A is not.
+    if (cfg.get("features") or {}).get("A"):
+        raise ContractViolation(
+            "feature A is not runnable here: it is a rank-selection feature and BOTH arms "
+            "need a selector, while `delta` is null and §2 requires the selector to refuse. "
+            "Setting delta is a protocol v1.1 event on development controls (P1-01)."
+        )
+    if config not in ablation["matched_budget_factorial"]["fixed_rank_configurations"]:
+        raise ContractViolation(
+            f"{config} is not a fixed-rank configuration; only "
+            f"{ablation['matched_budget_factorial']['fixed_rank_configurations']} can run "
+            "while the selector refuses"
+        )
+    # A matched-budget comparison is only matched if a budget was actually set.
+    if _arm(cfg) == "matched_budget" and not _cell_budget(cfg):
+        raise ContractViolation(
+            "arm 'matched_budget' requires discovery.cell_budget; without it B-ON and B-OFF "
+            "would see different numbers of cells and B would be confounded with sample size"
+        )
+    if (cfg.get("features") or {}).get("B") and _arm(cfg) != "matched_budget":
+        raise ContractViolation(
+            "feature B requires arm 'matched_budget'. B changes how cells are drawn from "
+            "donors, so comparing it against a full-pool arm would confound the sampling "
+            "rule with the number of cells."
+        )
 
     if cfg["factorization"]["optimizer_starts"] < 4:
         raise ContractViolation(
@@ -284,11 +336,11 @@ def run(config_path, out_root, run_id=None, dry_run=False):
                 fold, dataset_id, ds, cfg, fold_dir, provenance_common, exc,
             ))
             results.append(result_row(
-                experiment_id=make_experiment_id(CONFIGURATION, ARM_ID, dataset_id,
+                experiment_id=make_experiment_id(_configuration(cfg), _arm(cfg), dataset_id,
                                                  fold.outer_split_id, None,
                                                  {"seed": cfg["seed"]},
                                                  variant=cfg.get("variant")),
-                configuration=CONFIGURATION, arm=ARM_ID, dataset_id=dataset_id,
+                configuration=_configuration(cfg), arm=_arm(cfg), dataset_id=dataset_id,
                 independent_unit_id=fold.outer_split_id, independent_unit_type="experiment",
                 outer_split_id=fold.outer_split_id, metric="failed_fits_v1",
                 value=len(ranks), evaluation_scope="experiment", candidate_rank="",
@@ -316,11 +368,11 @@ def run(config_path, out_root, run_id=None, dry_run=False):
 def _failed_experiment_row(fold, dataset_id, ds, cfg, fold_dir, prov, exc):
     now = _utc()
     return experiment_row(
-        experiment_id=make_experiment_id(CONFIGURATION, ARM_ID, dataset_id,
+        experiment_id=make_experiment_id(_configuration(cfg), _arm(cfg), dataset_id,
                                          fold.outer_split_id, None, {"seed": cfg["seed"]},
                                          variant=cfg.get("variant")),
         prototype="true", feature_A="false", feature_B="false", feature_C="false",
-        arm=ARM_ID, status="failed", evidence_tier=cfg["evidence_tier"],
+        arm=_arm(cfg), status="failed", evidence_tier=cfg["evidence_tier"],
         dataset_id=dataset_id, dataset_manifest_hash=ds.dataset_manifest_hash,
         simulation_replicate=0, outer_split_id=fold.outer_split_id, inner_split_id="",
         mask_id=NOT_COMPUTED, sampling_replicate=0, optimizer_seed=cfg["seed"],
@@ -344,18 +396,62 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
     root = _repo_root()
     os.makedirs(fold_dir, exist_ok=True)
     is_train = np.isin(donors, np.asarray(fold.train_donors))
-    train_ids = [str(c) for c in adata.obs_names[is_train]]
+    pool_ids = [str(c) for c in adata.obs_names[is_train]]
+    pool_donors = donors[is_train]
 
     # PROTOCOL §3.3: cNMF sees training cells and nothing else.
-    train_path = os.path.join(fold_dir, "train_counts.h5ad")
-    adata[is_train].copy().write_h5ad(train_path)
-
     started, t0, c0 = _utc(), time.perf_counter(), time.process_time()
     obj = cNMF(output_dir=fold_dir, name=fold.outer_split_id)
+
+    genes_file = None
+    sample = None
+    if _arm(cfg) == "matched_budget":
+        # ---- feature B, and the constraint that makes its comparison legitimate ----
+        #
+        # `hold_preprocessing_constant_across_B: true` in the ablation plan. If each arm
+        # picked its own high-variance genes, B-ON and B-OFF would be fitted on DIFFERENT
+        # gene sets and the comparison would mix the sampling rule with the panel. So `G` is
+        # selected once, on the full training pool, and frozen for both arms via
+        # `prepare(genes_file=...)`.
+        #
+        # Computing it on the full pool is also what §3.2 asks for on its own terms: `G` is
+        # "computed on training donors only, frozen for the fold" — a property of the fold's
+        # training donors, not of whichever cells a sampling rule happened to draw.
+        pool_path = os.path.join(fold_dir, "pool_counts.h5ad")
+        adata[is_train].copy().write_h5ad(pool_path)
+        ref = cNMF(output_dir=fold_dir, name=fold.outer_split_id + "_panelref")
+        ref.prepare(counts_fn=pool_path, components=[min(ranks)], n_iter=1,
+                    num_highvar_genes=cfg["factorization"]["num_highvar_genes"],
+                    seed=cfg["seed"], beta_loss=cfg["factorization"]["loss"],
+                    max_NMF_iter=cfg["factorization"]["max_optimizer_iterations"])
+        genes_file = os.path.join(fold_dir, "frozen_G.txt")
+        with open(ref.paths["nmf_genes_list"], encoding="utf-8") as fh:
+            frozen = fh.read().rstrip("\n")
+        with open(genes_file, "w", encoding="utf-8") as fh:
+            fh.write(frozen)
+
+        sample = discovery_sample(
+            pool_ids, pool_donors, budget=int(_cell_budget(cfg)),
+            equal_per_donor=bool((cfg.get("features") or {}).get("B")),
+            # Independent of rank and optimizer seed, per the plan's
+            # hold_discovery_cells_constant_across_rank_and_optimizer_seeds.
+            seed=(cfg.get("discovery") or {}).get("sampling_seed", cfg["seed"]),
+        )
+        chosen = set(sample.cell_ids)
+        keep_rows = np.array([str(c) in chosen for c in adata.obs_names])
+        train_ids = list(sample.cell_ids)
+        fit_rows = keep_rows
+    else:
+        train_ids = pool_ids
+        fit_rows = is_train
+
+    train_path = os.path.join(fold_dir, "train_counts.h5ad")
+    adata[fit_rows].copy().write_h5ad(train_path)
     obj.prepare(
         counts_fn=train_path, components=ranks,
         n_iter=cfg["factorization"]["optimizer_starts"],
         num_highvar_genes=cfg["factorization"]["num_highvar_genes"],
+        genes_file=genes_file,
         seed=cfg["seed"], beta_loss=cfg["factorization"]["loss"],
         max_NMF_iter=cfg["factorization"]["max_optimizer_iterations"],
     )
@@ -369,14 +465,15 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
         g_list = fh.read().rstrip("\n").split("\n")
     g_pos = np.array([gene_names.index(g) for g in g_list])
 
-    s_g = training_gene_scale(raw[np.ix_(np.flatnonzero(is_train), g_pos)])
+    fit_pos = np.flatnonzero(fit_rows)
+    s_g = training_gene_scale(raw[np.ix_(fit_pos, g_pos)])
 
     import anndata as ad
     norm = ad.read_h5ad(obj.paths["normalized_counts"])
     if list(norm.var_names) != g_list:
         raise ContractViolation("norm_counts gene order differs from nmf_genes_list")
     transform_rel_error = verify_transform_matches_cnmf(
-        raw[np.ix_(np.flatnonzero(is_train), g_pos)], np.asarray(norm.X), s_g
+        raw[np.ix_(fit_pos, g_pos)], np.asarray(norm.X), s_g
     )
 
     panel = gene_panel(g_list, cfg["validation"]["inference_gene_fraction"],
@@ -406,7 +503,7 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
     x_test, test_donors = x_test[keep], donors[test_rows][keep]
     n_excluded = int((~keep).sum())
 
-    x_train_scaled = to_training_scale(raw[np.ix_(np.flatnonzero(is_train), g_pos)], s_g)
+    x_train_scaled = to_training_scale(raw[np.ix_(fit_pos, g_pos)], s_g)
     null_v = null_dictionary(x_train_scaled)  # scaled, not raw — a 4x error if confused
 
     diagnostics = [_fold_diagnostics(fold, ds, g_list, g_pos, panel, s_g, obj, ranks,
@@ -421,10 +518,10 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
     # construction. Its cost therefore belongs to no single rank. Giving it its own row
     # with `candidate_rank` empty lets the total be recovered by summing, with no double
     # counting and no invented amortisation. The schema already allows this.
-    fit_id = make_experiment_id(CONFIGURATION, ARM_ID, dataset_id, fold.outer_split_id,
+    fit_id = make_experiment_id(_configuration(cfg), _arm(cfg), dataset_id, fold.outer_split_id,
                                 None, {"seed": cfg["seed"]}, variant=cfg.get("variant"))
     fit_cost = _cost(fit_wall, fit_cpu, _peak_mb(), 0)
-    fit_common = dict(experiment_id=fit_id, configuration=CONFIGURATION, arm=ARM_ID,
+    fit_common = dict(experiment_id=fit_id, configuration=_configuration(cfg), arm=_arm(cfg),
                       dataset_id=dataset_id, outer_split_id=fold.outer_split_id,
                       candidate_rank="", status="ok_provisional",
                       artifact_path=os.path.relpath(fold_dir, root))
@@ -445,9 +542,11 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
         cpu_seconds=repr(fit_cost["cpu_seconds_v1"]),
         peak_memory_mb=repr(fit_cost["peak_memory_mb_v1"]),
         memory_scope=MEMORY_SCOPE, failure_reason="",
-        notes=(f"provisional={','.join(touched())}; arm=full_training_pool_no_cell_budget; "
+        notes=(f"provisional={','.join(touched())}; arm={_arm(cfg)}; "
                f"shared prepare/factorize/combine for ranks {ranks}; per-rank rows carry "
-               "marginal consensus+scoring cost only"),
+               "marginal consensus+scoring cost only"
+               + (f"; discovery={sample.mode},budget={sample.budget},"
+                  f"per_donor={sample.per_donor}" if sample else "")),
         **prov,
     ))
 
@@ -460,20 +559,73 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
         if list(v.columns) != g_list:
             raise ContractViolation("consensus_spectra gene order differs from G")
         v_arr = v.values.astype(np.float64)  # median_spectra: K x |G|, rows sum to 1
+        consensus_info = {}
+
+        if (cfg.get("features") or {}).get("C"):
+            # ---- feature C: one contribution per run per upstream cluster ----
+            #
+            # C reuses the IDENTICAL factor bank (the ablation plan's
+            # `reuse_identical_factor_banks_across_C`), so 000 vs 001 is an exactly paired
+            # comparison with no optimizer-randomness between the arms.
+            #
+            # Because `cnmf.py` may not be edited, the aggregation is reimplemented
+            # harness-side. That is only safe if the reimplementation reproduces upstream
+            # when the switch is off — otherwise the measured C effect is really the
+            # difference between upstream and this module. The check is run HERE, at run
+            # time on the actual bank, not only in the test suite, for the same reason
+            # `verify_transform_matches_cnmf` is: it guards a property of the data, not of
+            # the code path.
+            merged = load_df_from_npz(obj.paths["merged_spectra"] % k)
+            n_iter = cfg["factorization"]["optimizer_starts"]
+            v_off, _ = consensus_spectra_from_bank(merged, k, density_threshold, n_iter,
+                                                   one_per_run=False)
+            ref_a = np.sort(v_arr, axis=0)
+            ref_b = np.sort(v_off.values.astype(np.float64), axis=0)
+            rel = float(np.linalg.norm(ref_a - ref_b) / np.linalg.norm(ref_a))
+            if rel > 1e-8:
+                raise ContractViolation(
+                    f"feature C's OFF path diverges from upstream consensus by relative "
+                    f"Frobenius {rel:.3e} at k={k}. The C effect would be confounded with "
+                    "this divergence, so the run refuses rather than reporting it."
+                )
+            v_on, consensus_info = consensus_spectra_from_bank(
+                merged, k, density_threshold, n_iter, one_per_run=True)
+            if list(v_on.columns) != g_list:
+                raise ContractViolation("deduplicated spectra gene order differs from G")
+            v_arr = v_on.values.astype(np.float64)
+            consensus_info["off_path_rel_error_vs_upstream"] = rel
 
         u = nnls_usages(x_test[:, inf_pos], v_arr[:, inf_pos])
         loss_train_scale = squared_prediction_error(x_test[:, val_pos], u, v_arr[:, val_pos])
         loss_counts = count_unit_error(x_test[:, val_pos], u, v_arr[:, val_pos], s_g[val_pos])
         u_null = nnls_usages(x_test[:, inf_pos], null_v[:, inf_pos])
         loss_null = squared_prediction_error(x_test[:, val_pos], u_null, null_v[:, val_pos])
+
+        # ---- P0-04 metrics. Units are aligned EXPLICITLY (D013) ----
+        #
+        # The truth is generated in count space; `median_spectra` lives in the engine's
+        # scaled space. Measured, the unaligned comparison does not merely err, it reverses:
+        # a trivial null beats the fit at every rank. `Spectra` carries its space so the
+        # mismatch raises instead of scoring.
+        truth = Spectra(
+            np.asarray(ds.true_spectra, dtype=np.float64)[:, g_pos], "count", tuple(g_list)
+        ).to_scaled(s_g)
+        fitted = Spectra(v_arr, "scaled", tuple(g_list))
+        recovery, alignment = recovery_cosine(truth, fitted)
+        recovery_null, _ = recovery_cosine(truth, matched_null_spectra(truth, k))
+        # Reuses the alignment from the loadings; re-deriving one from usages would choose
+        # whichever permutation flatters the usages and could disagree with the permutation
+        # the recovery score was computed on.
+        usage_err, _ = usage_error(
+            np.asarray(ds.true_usages, dtype=np.float64)[test_rows[keep]], u, alignment)
         wall, cpu = time.perf_counter() - t1, time.process_time() - c1
 
-        exp_id = make_experiment_id(CONFIGURATION, ARM_ID, dataset_id, fold.outer_split_id, k,
+        exp_id = make_experiment_id(_configuration(cfg), _arm(cfg), dataset_id, fold.outer_split_id, k,
                                     {"seed": cfg["seed"],
                                      "panel_seed": cfg["validation"]["panel_seed"]},
                                     variant=cfg.get("variant"))
         artifact = os.path.relpath(obj.paths["consensus_spectra"] % (k, dt_repl), root)
-        common = dict(experiment_id=exp_id, configuration=CONFIGURATION, arm=ARM_ID,
+        common = dict(experiment_id=exp_id, configuration=_configuration(cfg), arm=_arm(cfg),
                       dataset_id=dataset_id, outer_split_id=fold.outer_split_id,
                       candidate_rank=k, status="ok_provisional", artifact_path=artifact)
 
@@ -497,13 +649,24 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
                 n_eligible_units=agg.n_eligible_donors, n_failed_units=agg.n_failed_donors,
             ))
 
+        # Experiment-scope, not per-donor: both are properties of the fitted dictionary
+        # against the known truth, not of any held-out donor.
+        for metric, value in (("program_recovery_cosine_v1", recovery),
+                              ("usage_error_v1", usage_err)):
+            results.append(result_row(
+                **common, independent_unit_id=exp_id, independent_unit_type="experiment",
+                metric=metric, value=repr(value), evaluation_scope="experiment",
+                n_eligible_units=1, n_failed_units=0,
+            ))
+
         # Marginal cost only — the shared fit is on its own row above.
         rank_cost = _cost(wall, cpu, _peak_mb(), 0)
         results.extend(_cost_result_rows(rank_cost, common, exp_id))
 
         experiments.append(experiment_row(
-            experiment_id=exp_id, prototype="true", feature_A="false", feature_B="false",
-            feature_C="false", arm=ARM_ID, status="completed",
+            experiment_id=exp_id, prototype="true", feature_A=_bit(cfg, "A"),
+            feature_B=_bit(cfg, "B"), feature_C=_bit(cfg, "C"), arm=_arm(cfg),
+            status="completed",
             evidence_tier=cfg["evidence_tier"], dataset_id=dataset_id,
             dataset_manifest_hash=ds.dataset_manifest_hash, simulation_replicate=0,
             outer_split_id=fold.outer_split_id, inner_split_id="", mask_id=panel.mask_id,
@@ -519,9 +682,18 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
             cpu_seconds=repr(rank_cost["cpu_seconds_v1"]),
             peak_memory_mb=repr(rank_cost["peak_memory_mb_v1"]),
             memory_scope=MEMORY_SCOPE, failure_reason="",
-            notes=(f"provisional={','.join(touched())}; arm=full_training_pool_no_cell_budget; "
+            # The matched null for recovery lives HERE and not in a metric column,
+            # because PROTOCOL §5.2 defines exactly eleven metric names and none of them
+            # is a recovery null. Inventing a twelfth would break §5.1. It must still
+            # travel beside every recovery row: measured, a dictionary of K copies of the
+            # mean true profile already scores ~0.85, so an unaccompanied 0.87 reads as
+            # strong and is not. Batched into the v1.1 amendment.
+            notes=(f"provisional={','.join(touched())}; arm={_arm(cfg)}; "
                    f"density_threshold={density_threshold}; marginal consensus+scoring "
-                   f"cost only — the shared fit is on the {fold.outer_split_id} fit row"),
+                   f"cost only — the shared fit is on the {fold.outer_split_id} fit row; "
+                   f"program_recovery_matched_null={recovery_null!r}"
+                   + (f"; {consensus_info}" if consensus_info else "")
+                   + (f"; discovery={sample.mode},budget={sample.budget}" if sample else "")),
             **prov,
         ))
 

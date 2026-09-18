@@ -1,0 +1,106 @@
+## Features B and C wired into the runner, and the first A-OFF factorial rows. 2026-09-18.
+##
+## SMOKE tier, configuration 000/001/010/011 -- the four cells the ablation plan lists as
+## `fixed_rank_configurations`, i.e. the ones runnable while `delta` is null and the rank
+## selector must refuse. Feature A is refused by `check_preconditions` for exactly that
+## reason: BOTH of A's arms need a selector, including the A-OFF silhouette baseline.
+##
+## All four cells share arm `matched_budget` with cell_budget 180 and sampling_seed 424242.
+## An earlier draft of smoke_001.yaml left C on the full training pool, which would have made
+## 000-vs-001 a comparison across two different arms -- C confounded with how many cells each
+## side factorized. Corrected before any number below was recorded.
+##
+## Rows merged: 134 RESULTS + 8 EXPERIMENTS per configuration. Tracked totals now 1878/72.
+##
+## ======================= HEADLINE: SMOKE CANNOT TEST FEATURE C =======================
+##
+## 000 and 001 are IDENTICAL at every rank and fold. That is correct behaviour, not a bug,
+## and the runner's own diagnostic says why:
+##
+configuration	outer_split_id	candidate_rank	factor_bank_size	contributions_dropped_by_C	off_path_rel_error_vs_upstream
+001	outer_0	2	10	0	0.0
+001	outer_0	3	15	0	0.0
+001	outer_0	4	20	0	0.0
+001	outer_1	2	10	0	0.0
+001	outer_1	3	15	0	0.0
+001	outer_1	4	20	0	0.0
+011	outer_0	2	10	0	0.0
+011	outer_0	3	15	0	0.0
+011	outer_0	4	20	1	0.0
+011	outer_1	2	10	0	0.0
+011	outer_1	3	15	0	0.0
+011	outer_1	4	20	0	0.0
+##
+## C drops a contribution in ONE of twelve cases. It fires when a single optimizer run puts
+## two spectra in the same consensus cluster, and at SMOKE the factor bank is only
+## `n_iter * k` = 10-20 spectra (5 starts, k <= 4), so a run almost never splits a program.
+##
+## The one case that did fire is exactly the one cell where 011 differs from 010
+## (outer_0, k=4: recovery 0.7354 -> 0.7353, usage error 0.5578 -> 0.5601). Cause and effect
+## line up with no residual, which is the strongest available evidence that the switch is
+## wired correctly AND that its absence elsewhere is real rather than a plumbing failure.
+##
+## CONSEQUENCE, and it generalises past this run: a 000-vs-001 comparison at SMOKE will
+## report "no difference" and that reading would be WRONG. The correct reading is "this tier
+## cannot exercise the feature". Feature C requires a factor bank large enough for runs to
+## split programs. Measured on the Kang 2018 run (n_iter 10, k 6-14, bank 60-140), C dropped
+## 1-9 contributions per rank -- so the capability appears somewhere between these two
+## scales, and DEVELOPMENT (n_iter 10, k 4-10, bank 40-100) is the tier to test it at.
+##
+## This is the same class of finding the P0-03 feasibility gate exists to catch, now applied
+## to a feature rather than to rank selection: asking whether the benchmark is CAPABLE of
+## showing the effect before reading a null result as evidence of absence.
+##
+## ---- THE RUNTIME GUARD ON C, which is what makes any C number interpretable ----
+## `off_path_rel_error_vs_upstream` = 0.0 in all twelve cases: bitwise.
+##
+## C modifies the consensus step, which lives in `cnmf.py` and may not be edited, so the
+## aggregation is reimplemented harness-side. A reimplementation that silently differed from
+## upstream would make every 000-vs-001 contrast measure the divergence rather than the
+## feature. The runner therefore recomputes the OFF path on the actual bank at run time and
+## REFUSES above 1e-8, rather than trusting the test suite -- the same reasoning as
+## `verify_transform_matches_cnmf`, which guards a property of the data, not of the code path.
+## Independently pinned in test_features.py against the real Kang banks at k=6,8,10,12,14,
+## also at relative Frobenius 0.000e+00.
+##
+## ======================= THE FOUR-CELL TABLE =======================
+## `recov` = program_recovery_cosine_v1 (higher better), `uerr` = usage_error_v1 (lower
+## better), `loss` = heldout_squared_prediction_error_v1, equal-donor mean (lower better).
+##
+candidate_rank	outer_split_id	cfg000_recov	cfg000_uerr	cfg000_loss	cfg001_recov	cfg001_uerr	cfg001_loss	cfg010_recov	cfg010_uerr	cfg010_loss	cfg011_recov	cfg011_uerr	cfg011_loss
+2	outer_0	0.6585	0.2468	17.74	0.6585	0.2468	17.74	0.6570	0.2825	17.91	0.6570	0.2825	17.91
+2	outer_1	0.6589	0.2227	15.60	0.6589	0.2227	15.60	0.6598	0.1960	15.33	0.6598	0.1960	15.33
+3	outer_0	0.9826	0.3835	15.47	0.9826	0.3835	15.47	0.9807	0.3998	15.22	0.9807	0.3998	15.22
+3	outer_1	0.9859	0.2928	13.82	0.9859	0.2928	13.82	0.9858	0.2654	13.66	0.9858	0.2654	13.66
+4	outer_0	0.7330	0.7246	15.97	0.7330	0.7246	15.97	0.7354	0.5578	15.61	0.7353	0.5601	15.58
+4	outer_1	0.7360	0.4975	14.51	0.7360	0.4975	14.51	0.7346	0.5973	14.56	0.7346	0.5973	14.56
+##
+## ---- WHAT MAY AND MAY NOT BE CONCLUDED ----
+##
+## NO ADOPTION DECISION MAY CITE ANY OF THIS. `smoke_can_promote_feature: false` and
+## `allow_scientific_promotion: false`; the ablation plan's margins are all NOT_SET; and
+## `contracts/A.md` aside, no feature contract with frozen endpoints exists for B or C.
+## scientific_adoption for both B and C is INCONCLUSIVE.
+##
+## FEATURE C: untestable at this tier. Not "no effect" -- untestable. Retest at DEVELOPMENT.
+##
+## FEATURE B: differences exist but are small and MIXED IN SIGN, and there are two folds.
+## At k=4 outer_0, B improves all three (recov +0.0024, uerr -0.1668, loss -0.36); at k=4
+## outer_1 it worsens recovery and usage error while barely moving loss. With n=2 folds and
+## no sampling replicates, nothing here separates a B effect from the variance of a single
+## discovery draw -- which is precisely what `features.discovery_sample_b`'s fence entry says
+## hardening requires. Reporting the direction as a finding would be reading noise.
+##
+## RECOVERY METRIC SANITY: recovery peaks at k=3 = K_true (0.981-0.986) in every configuration
+## and both folds, against 0.66 at k=2 and 0.73 at k=4. The metric behaves as P0-04 intended
+## on data where the truth is known, which is the first time it has been exercised in the
+## runner rather than in tests.
+##
+## The matched null for recovery is written to the EXPERIMENTS `notes` field, NOT to a metric
+## column: PROTOCOL 5.2 defines exactly eleven metric names and none is a recovery null, and
+## inventing a twelfth would break 5.1. It must still travel beside every recovery row --
+## measured, K copies of the mean true profile already score ~0.85. Batched into v1.1.
+##
+## software_status	PASS	(4 configurations x 2 folds x 3 ranks; 191 tests green; upstream diff empty)
+## scientific_adoption	INCONCLUSIVE	(B: underpowered at n=2 folds; C: untestable at this tier)
+## evidence_tier	SMOKE
