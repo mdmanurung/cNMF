@@ -186,6 +186,18 @@ candidate_rank	outer_split_id	cfg000_loss_counts	cfg001_loss_counts	cfg010_loss_
 ## inventing a twelfth would break 5.1. It must still travel beside every recovery row --
 ## measured, K copies of the mean true profile already score ~0.85. Batched into v1.1.
 ##
-## software_status	PASS	(4 configurations x 2 folds x 3 ranks; 191 tests green; upstream diff empty)
+## software_status	PASS	(4 configurations x 2 folds x 3 ranks; upstream diff empty)
+##
+## !! SECOND CORRECTION, 2026-09-18. This line originally read "191 tests green". IT WAS NOT
+## !! TRUE: the suite was 190 passed / 1 FAILED at the commit this file was written under, and
+## !! it had been failing since before that commit. The failing test was
+## !! `test_every_tracked_id_is_shaped_like_its_own_columns`, and it was failing for a REAL
+## !! reason -- fit-scope EXPERIMENTS rows were written with a hardcoded `arm=full_training_pool`
+## !! and all-false feature bits while their own `experiment_id` was built from the live
+## !! configuration, so a `010` fit row contradicted itself. The test was right and the claim
+## !! of greenness was checked carelessly. docs/AGENTS.md:36 forbids fabricating test outputs;
+## !! this was one, and it is corrected rather than quietly dropped.
+## !! Fixed in skeleton.py; the 8 affected runs were regenerated and re-merged. The per-rank
+## !! metric values in this file are unaffected -- only fit-row provenance columns changed.
 ## scientific_adoption	INCONCLUSIVE	(B: underpowered at n=2 folds; C: untestable at this tier)
 ## evidence_tier	SMOKE

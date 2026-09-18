@@ -27,11 +27,32 @@ def load_rows(path):
 
 
 def _preprocessing_by_experiment(experiments):
-    return {e["experiment_id"]: e["preprocessing_hash"] for e in experiments}
+    """The identity a row must share to be poolable: **both** hashes, as a pair.
+
+    `preprocessing_hash` alone is not enough, and the gap was not hypothetical. Feature B
+    changes which cells reach `cnmf.prepare`, and `prepare` computes the per-gene scale
+    `s_g` internally from exactly those cells — but `preprocessing_hash` carries `s_g_ddof`
+    and **not** `s_g`, so both B arms hash identically. Measured: all four SMOKE
+    configurations share `c9ba55b825846b53205c1816` at `outer_0`, while their scales differ
+    by a median factor of 1.04 and up to 1.24. This function's own docstring promised to
+    separate rows fitted on "different gene panels and per-gene scales"; on the scale half
+    it was letting exactly that pooling through.
+
+    `discovery_cells_hash` closes it without touching any hash formula. It is already a
+    column, it already differs precisely when the arms differ, and it is **upstream** of
+    `s_g` — the same cells deterministically give the same scale — so it is a stricter key
+    than `s_g` would be, and it needs no quantization to survive BLAS noise on a replay.
+    Adding `s_g` to `preprocessing_hash` instead would have versioned the guard, leaving
+    older rows hashed under one formula and newer rows under another. See D016.
+    """
+    return {
+        e["experiment_id"]: (e["preprocessing_hash"], e.get("discovery_cells_hash", ""))
+        for e in experiments
+    }
 
 
 def assert_poolable(rows, experiments):
-    """Raise unless every row shares one `preprocessing_hash`.
+    """Raise unless every row shares one `(preprocessing_hash, discovery_cells_hash)`.
 
     Call this before any aggregation that crosses rows. It is deliberately strict: a
     caller that genuinely wants a cross-fold summary should say so by aggregating the
@@ -47,18 +68,27 @@ def assert_poolable(rows, experiments):
         )
     hashes = {lookup[r["experiment_id"]] for r in rows}
     if len(hashes) > 1:
+        n_pre = len({h[0] for h in hashes})
+        detail = (
+            f"{n_pre} distinct preprocessing_hash values"
+            if n_pre > 1
+            else "one preprocessing_hash but two or more discovery_cells_hash values, so "
+            "they were fitted on the same gene panel from DIFFERENT CELLS and therefore on "
+            "different per-gene scales"
+        )
         raise PoolingError(
-            f"rows span {len(hashes)} distinct preprocessing_hash values, so they were "
-            "fitted on different gene panels and per-gene scales and are not on a common "
-            "axis. Averaging them produces a number that describes no measurement. "
-            "Aggregate within each group instead — see pooling_groups()."
+            f"rows span {detail}, so they are not on a common axis. Averaging them produces "
+            "a number that describes no measurement. Aggregate within each group instead — "
+            "see pooling_groups()."
         )
     return True
 
 
 def pooling_groups(rows, experiments):
-    """Partition rows into groups that *are* on a common axis, keyed by
-    `preprocessing_hash`. Aggregate within a group; report groups side by side."""
+    """Partition rows into groups that *are* on a common axis, keyed by the
+    `(preprocessing_hash, discovery_cells_hash)` pair. Aggregate within a group; report
+    groups side by side. Two B arms land in different groups even though their gene panel
+    is deliberately identical, because their per-gene scales are not."""
     lookup = _preprocessing_by_experiment(experiments)
     groups = {}
     for r in rows:

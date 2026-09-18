@@ -314,6 +314,34 @@ def test_pooling_across_folds_is_refused():
     assert assert_poolable(next(iter(groups.values())), experiments)
 
 
+def test_pooling_across_the_two_B_arms_is_refused_although_their_gene_panel_is_identical():
+    """The gap `preprocessing_hash` alone could not see.
+
+    Feature B holds `G` deliberately constant across its arms — verified byte-identical, via
+    `prepare(genes_file=...)` — so every input to `preprocessing_hash` is the same on both
+    sides and the two arms hash IDENTICALLY (measured: `c9ba55b825846b53205c1816` for all
+    four SMOKE configurations at `outer_0`). What differs is `s_g`, which `prepare` computes
+    from whichever cells the sampling rule drew, by a median factor of 1.04 and up to 1.24.
+
+    So the guard's own promise — rows spanning "different gene panels and per-gene scales"
+    are refused — was false on the scale half, and a cross-arm `groupby().mean()` would have
+    been permitted. `discovery_cells_hash` is what makes the arms distinguishable. See D016.
+    """
+    from cnmfbench.analysis import PoolingError, assert_poolable
+
+    experiments = [
+        {"experiment_id": "b_off", "preprocessing_hash": "same", "discovery_cells_hash": "A"},
+        {"experiment_id": "b_on", "preprocessing_hash": "same", "discovery_cells_hash": "B"},
+    ]
+    rows = [{"experiment_id": "b_off"}, {"experiment_id": "b_on"}]
+    assert len({e["preprocessing_hash"] for e in experiments}) == 1, (
+        "this test is only meaningful while the two arms share a preprocessing_hash"
+    )
+    with pytest.raises(PoolingError, match="DIFFERENT CELLS"):
+        assert_poolable(rows, experiments)
+    assert assert_poolable(rows[:1], experiments), "one arm alone must still pool"
+
+
 def test_pooling_guard_refuses_rows_with_no_provenance():
     from cnmfbench.analysis import PoolingError, assert_poolable
 

@@ -101,12 +101,16 @@ PROVISIONAL = {
             component_id="features.discovery_sample_b",
             owner_task="P2-01",
             reason="Feature B's matched-budget draw. The redistribution rule for donors "
-            "holding fewer cells than their equal share is this implementation's choice, "
-            "and `hold_preprocessing_constant_across_B` is enforced by passing a frozen "
-            "gene list rather than by anything checking that G could not have drifted.",
-            hardening_requires="A cross-arm audit that G, s_g and the panel are identical "
-            "between B-ON and B-OFF, plus sampling replicates so the draw's variance is "
-            "reported rather than assumed negligible.",
+            "holding fewer cells than their equal share is this implementation's choice. "
+            "`hold_preprocessing_constant_across_B` holds for G — frozen into both arms via "
+            "`prepare(genes_file=...)`, verified byte-identical — and CANNOT hold for s_g, "
+            "which `cnmf.prepare` computes from whichever cells the rule drew; measured "
+            "drift median 1.04, max 1.24. See D016.",
+            hardening_requires="Sampling replicates, so the draw's variance is reported "
+            "rather than assumed negligible — currently one draw per arm, which is why B is "
+            "INCONCLUSIVE and not 'no effect'. NOT an audit asserting s_g identical across "
+            "arms: D016 shows that cannot be met while `src/cnmf/**` is unmodifiable. The "
+            "drift is reported instead, and cross-arm endpoints are read in count units.",
         ),
     ]
 }

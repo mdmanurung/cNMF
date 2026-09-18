@@ -59,11 +59,10 @@ from .recovery import Spectra, matched_null_spectra, recovery_cosine, usage_erro
 from .simulate import simulate
 from .splits import gene_panel, outer_donor_folds
 
-# Kept as the defaults the first 1342 rows were written under. The live values come from
-# `_configuration` / `_arm`, so a feature switch is visible in the record rather than
-# implied by which code path ran.
-ARM_ID = "full_training_pool"
-CONFIGURATION = "000"
+# Every configuration and arm comes from `_configuration` / `_arm`, so a feature switch is
+# visible in the record rather than implied by which code path ran. The module-level defaults
+# these replaced are deleted rather than left dead: one of them was still being written into
+# fit-scope rows, where it contradicted those rows' own `experiment_id`.
 
 
 def _bit(cfg, name):
@@ -282,7 +281,8 @@ def run(config_path, out_root, run_id=None, dry_run=False):
         ablation = yaml.safe_load(fh)
 
     params = check_preconditions(cfg, ablation)
-    run_id = run_id or f"p0skel-{CONFIGURATION}-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}"
+    run_id = run_id or (
+        f"p0skel-{_configuration(cfg)}-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}")
     run_dir = os.path.join(out_root, run_id)
     os.makedirs(run_dir, exist_ok=True)
 
@@ -527,8 +527,15 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
                       artifact_path=os.path.relpath(fold_dir, root))
     results.extend(_cost_result_rows(fit_cost, fit_common, fit_id))
     experiments.append(experiment_row(
-        experiment_id=fit_id, prototype="true", feature_A="false", feature_B="false",
-        feature_C="false", arm=ARM_ID, status="completed",
+        # The fit row describes the run it came from, not a hardcoded baseline. It once
+        # carried a hardcoded `full_training_pool` and all-false bits while its own id was
+        # built from `_arm(cfg)` / `_configuration(cfg)` — so a `010` fit row announced
+        # `full_training_pool` and `feature_B=false` in the columns and `matched_budget` in
+        # the id. `test_every_tracked_id_is_shaped_like_its_own_columns` caught it.
+        # `feature_B` is not cosmetic here: B changes which cells this very fit saw.
+        experiment_id=fit_id, prototype="true", feature_A=_bit(cfg, "A"),
+        feature_B=_bit(cfg, "B"), feature_C=_bit(cfg, "C"), arm=_arm(cfg),
+        status="completed",
         evidence_tier=cfg["evidence_tier"], dataset_id=dataset_id,
         dataset_manifest_hash=ds.dataset_manifest_hash, simulation_replicate=0,
         outer_split_id=fold.outer_split_id, inner_split_id="", mask_id=panel.mask_id,
