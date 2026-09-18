@@ -21,6 +21,7 @@ from collections import namedtuple
 import numpy as np
 
 from . import PROTOCOL_VERSION
+from .contract import ContractViolation
 from .hashing import cell_set_hash, parameter_hash
 from .provisional import provisional
 
@@ -85,7 +86,7 @@ def outer_donor_folds(donor_ids, n_folds, seed):
 
 
 @provisional("splits.outer_donor_folds")
-def inner_donor_folds(train_donors, n_folds, seed, outer_index):
+def inner_donor_folds(outer_fold, n_folds, seed):
     """Split ONE outer fold's training donors into inner training/validation folds.
 
     The second level of `IMPLEMENTATION_PROMPT.md:160-173`:
@@ -97,36 +98,54 @@ def inner_donor_folds(train_donors, n_folds, seed, outer_index):
     **This is the thing whose absence made feature A impossible.** A is inner-validation
     rank selection; with outer folds alone there is no inner validation to select on.
 
-    `outer_index` enters the seed so that two outer folds do not receive the same inner
-    partition of different donor sets — which would be harmless but would make an inner
-    fold's identity ambiguous across the run. Derived through `SeedSequence` rather than
-    by arithmetic on the seed, the same way `gene_panel` mixes its repetition, so that
-    neighbouring `(seed, outer_index)` pairs do not give correlated streams.
+    **It takes the whole `DonorFold`, not a list of donors, and that is the point.** The
+    highest-severity failure this task exists to prevent is an outer *test* donor reaching
+    an inner split: rank selection would then choose K using the data it is later scored
+    on, the outer score would simply be optimistic, and nothing would crash. A function
+    given a bare list cannot refuse a caller that passes the full donor roster by mistake.
+    Given the fold, it can — and does, below.
 
-    The caller passes `fold.train_donors`, never the full donor list: **an inner split
-    that could see an outer test donor would defeat the whole nesting.** That is checked
-    by the caller's own fold object rather than here, because this function is not given
-    the test donors and so cannot verify it — `test_an_inner_fold_never_contains_an_outer_test_donor`
-    asserts the composition end to end.
+    The outer index is parsed from `outer_split_id` and enters the seed through
+    `SeedSequence`, the same way `gene_panel` mixes its `repetition` (`splits.py:84`),
+    rather than by arithmetic — so neighbouring `(seed, outer_index)` pairs do not give
+    correlated streams. Without it, every outer fold would apply the same permutation to
+    its own (different) donors, which is not wrong but makes "unrelated inner folds"
+    (`IMPLEMENTATION_PROMPT.md:192`) less unrelated than that clause assumes.
 
     Note the `@provisional` id is shared with `outer_donor_folds`: the fence entry's
     `hardening_requires` is "Nested outer/inner donor folds", i.e. this function IS that
     component's hardening, and the two are un-fenced together or not at all.
     """
-    seq = np.random.SeedSequence([int(seed), int(outer_index)])
-    donors, blocks = _held_out_blocks(train_donors, n_folds, np.random.default_rng(seq))
+    outer_index = int(str(outer_fold.outer_split_id).rsplit("_", 1)[-1])
+    seq = np.random.SeedSequence([int(seed), outer_index])
+    donors, blocks = _held_out_blocks(
+        outer_fold.train_donors, n_folds, np.random.default_rng(seq)
+    )
+    forbidden = set(str(d) for d in outer_fold.test_donors)
 
     folds = []
     for j, validation in enumerate(blocks):
         train = sorted(d for d in donors if d not in set(validation))
         if not train or not validation:
             raise ValueError(
-                f"inner fold {j} of outer_{outer_index} is degenerate: {len(train)} train, "
-                f"{len(validation)} validation. With {len(donors)} training donors and "
-                f"n_folds={n_folds} there is not enough to nest — reduce the tier's fold "
-                "count deliberately and record it, rather than letting a fold vanish."
+                f"inner fold {j} of {outer_fold.outer_split_id} is degenerate: {len(train)} "
+                f"train, {len(validation)} validation. With {len(donors)} training donors "
+                f"and n_folds={n_folds} there is not enough to nest — reduce the tier's "
+                "fold count deliberately and record it, rather than letting a fold vanish."
             )
-        folds.append(InnerFold(f"inner_{j}", tuple(train), tuple(validation)))
+        leaked = forbidden & (set(train) | set(validation))
+        if leaked:
+            raise ContractViolation(
+                f"outer test donor(s) {sorted(leaked)} reached an inner split of "
+                f"{outer_fold.outer_split_id}. Rank selection would then choose K using "
+                "the data it is later scored on, and the outer score would be optimistic "
+                "with nothing raised. This is the leak the nesting exists to prevent."
+            )
+        # `outer_0_inner_1`, not `inner_1`: EXPERIMENTS.tsv is read back flat, and the
+        # bare form does not say which outer fold it partitions.
+        folds.append(InnerFold(
+            f"{outer_fold.outer_split_id}_inner_{j}", tuple(train), tuple(validation)
+        ))
     return folds
 
 

@@ -12,7 +12,7 @@ from cnmfbench.scoring import (
     count_unit_error, equal_donor_mean, nnls_usages, null_dictionary, scoreable_mask,
     squared_prediction_error, to_training_scale, training_gene_scale,
 )
-from cnmfbench.splits import gene_panel, inner_donor_folds, outer_donor_folds
+from cnmfbench.splits import DonorFold, gene_panel, inner_donor_folds, outer_donor_folds
 
 DONORS = [f"donor_{i:03d}" for i in range(8)]
 GENES = [f"gene_{i:05d}" for i in range(100)]
@@ -56,14 +56,24 @@ def test_an_inner_fold_never_contains_an_outer_test_donor():
     result would be optimistic with nothing crashing."""
     for fold in outer_donor_folds(DONORS, 2, seed=7):
         held_out = set(fold.test_donors)
-        for inner in inner_donor_folds(fold.train_donors, 2, seed=7, outer_index=0):
+        for inner in inner_donor_folds(fold, 2, seed=7):
             leaked = held_out & (set(inner.train_donors) | set(inner.validation_donors))
             assert not leaked, f"outer test donor(s) {sorted(leaked)} reached {inner.inner_split_id}"
 
 
+def test_the_splitter_itself_refuses_a_fold_whose_train_and_test_donors_overlap():
+    """The guard that makes the signature worth its shape. `inner_donor_folds` takes the
+    whole `DonorFold` rather than a donor list precisely so it can refuse this; a function
+    given a bare list cannot tell a training roster from the full one, and the mistake
+    produces an optimistic score rather than an error."""
+    bad = DonorFold("outer_0", tuple(DONORS), (DONORS[0], DONORS[1]))
+    with pytest.raises(ContractViolation, match="reached an inner split"):
+        inner_donor_folds(bad, 2, seed=7)
+
+
 def test_inner_folds_partition_the_outer_training_donors_exactly():
     fold = outer_donor_folds(DONORS, 2, seed=7)[0]
-    inners = inner_donor_folds(fold.train_donors, 2, seed=7, outer_index=0)
+    inners = inner_donor_folds(fold, 2, seed=7)
     seen = []
     for inner in inners:
         assert not set(inner.train_donors) & set(inner.validation_donors)
@@ -78,31 +88,35 @@ def test_inner_folds_are_deterministic_and_do_not_read_global_numpy_state():
     already run in this process. Seeding the global RNG between calls must change
     nothing."""
     fold = outer_donor_folds(DONORS, 2, seed=7)[0]
-    a = inner_donor_folds(fold.train_donors, 2, seed=11, outer_index=0)
+    a = inner_donor_folds(fold, 2, seed=11)
     np.random.seed(12345)
-    b = inner_donor_folds(fold.train_donors, 2, seed=11, outer_index=0)
+    b = inner_donor_folds(fold, 2, seed=11)
     assert a == b
 
 
 def test_the_outer_index_changes_the_inner_partition():
     """Two outer folds must not receive the same inner partition, or an inner fold's
     identity would be ambiguous across the run."""
-    donors = [f"d{i}" for i in range(12)]
-    a = inner_donor_folds(donors, 3, seed=5, outer_index=0)
-    b = inner_donor_folds(donors, 3, seed=5, outer_index=1)
+    donors = tuple(f"d{i}" for i in range(12))
+    a = inner_donor_folds(DonorFold("outer_0", donors, ("x",)), 3, seed=5)
+    b = inner_donor_folds(DonorFold("outer_1", donors, ("x",)), 3, seed=5)
     assert [f.validation_donors for f in a] != [f.validation_donors for f in b]
 
 
 def test_inner_folds_are_independent_of_input_donor_order():
-    donors = [f"d{i:02d}" for i in range(9)]
-    a = inner_donor_folds(donors, 3, seed=3, outer_index=0)
-    b = inner_donor_folds(list(reversed(donors)), 3, seed=3, outer_index=0)
+    donors = tuple(f"d{i:02d}" for i in range(9))
+    a = inner_donor_folds(DonorFold("outer_0", donors, ("x",)), 3, seed=3)
+    b = inner_donor_folds(DonorFold("outer_0", tuple(reversed(donors)), ("x",)), 3, seed=3)
     assert a == b
 
 
-def test_inner_split_ids_are_scoped_and_stable():
-    ids = [f.inner_split_id for f in inner_donor_folds([f"d{i}" for i in range(6)], 3, 1, 0)]
-    assert ids == ["inner_0", "inner_1", "inner_2"]
+def test_inner_split_ids_carry_their_outer_fold():
+    """`EXPERIMENTS.tsv` is read back flat and nothing in the schema enforces a join on
+    `(outer_split_id, inner_split_id)`. A bare `inner_1` would not say which outer fold it
+    partitions, so the id carries its own prefix."""
+    donors = tuple(f"d{i}" for i in range(6))
+    ids = [f.inner_split_id for f in inner_donor_folds(DonorFold("outer_1", donors, ("x",)), 3, 1)]
+    assert ids == ["outer_1_inner_0", "outer_1_inner_1", "outer_1_inner_2"]
 
 
 def test_too_few_training_donors_raises_and_says_what_to_do():
@@ -110,7 +124,7 @@ def test_too_few_training_donors_raises_and_says_what_to_do():
     donors must refuse loudly — silently dropping a fold would change the evaluator
     without changing any recorded number."""
     with pytest.raises(ValueError, match="not usable with"):
-        inner_donor_folds(["d0", "d1"], 3, seed=1, outer_index=0)
+        inner_donor_folds(DonorFold("outer_0", ("d0", "d1"), ("d2",)), 3, seed=1)
 
 
 def test_smoke_scale_nesting_is_possible_at_all():
@@ -121,7 +135,7 @@ def test_smoke_scale_nesting_is_possible_at_all():
     than a reason to quietly lower the fold count."""
     fold = outer_donor_folds(DONORS, 2, seed=7)[0]
     assert len(fold.train_donors) == 4
-    inners = inner_donor_folds(fold.train_donors, 2, seed=7, outer_index=0)
+    inners = inner_donor_folds(fold, 2, seed=7)
     assert [len(f.train_donors) for f in inners] == [2, 2]
 
 
