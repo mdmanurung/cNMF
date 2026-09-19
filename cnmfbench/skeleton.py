@@ -61,7 +61,7 @@ from .scoring import (
 from .features import consensus_spectra_from_bank, discovery_sample
 from .recovery import Spectra, matched_null_spectra, recovery_cosine, usage_error
 from .simulate import simulate
-from .splits import gene_panel, outer_donor_folds
+from .splits import gene_panel, inner_donor_folds, outer_donor_folds
 
 # Every configuration and arm comes from `_configuration` / `_arm`, so a feature switch is
 # visible in the record rather than implied by which code path ran. The module-level defaults
@@ -89,6 +89,43 @@ def _arm(cfg):
 
 def _cell_budget(cfg):
     return (cfg.get("discovery") or {}).get("cell_budget")
+
+
+def read_delta():
+    """The frozen §2 constant, read from the frozen file (single source of truth).
+
+    `check_preconditions` verifies the file's hash before anything reads this,
+    so a caller that passed the gate reads the frozen value, not a drifted one.
+    Returns the float, or None while no v1.1-style value is present (in which
+    case feature A still refuses, per §2's null-until-calibrated policy).
+    """
+    import re
+
+    path = os.path.join(_repo_root(), "docs/planning/PROTOCOL.md")
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            m = re.match(r"^`delta:\s*([0-9.]+|null)`\s*$", line.strip())
+            if m:
+                return None if m.group(1) == "null" else float(m.group(1))
+    raise ContractViolation("PROTOCOL.md carries no `delta:` line; the file is not v1+?")
+
+
+def _guaranteed_inner_train_cells(params, n_outer_folds, n_inner_folds):
+    """Lower bound on inner-training cells when cells_per_donor has no variance.
+
+    Striping keeps blocks within one of each other, so the smallest outer-train
+    pool is D - ceil(D/F) donors and the smallest inner-train pool is that minus
+    ceil of itself over f — all at cells_per_donor each. Returns None when
+    cells_per_donor_cv != 0 (no closed form; the exact post-simulate check in
+    run() governs instead).
+    """
+    import math
+
+    if params.cells_per_donor_cv != 0:
+        return None
+    outer_train = params.n_donors - math.ceil(params.n_donors / n_outer_folds)
+    inner_train = outer_train - math.ceil(outer_train / n_inner_folds)
+    return inner_train * params.cells_per_donor
 
 
 def _utc():
@@ -189,18 +226,21 @@ def check_preconditions(cfg, ablation):
     # donor-blocked predictive error, and the A-OFF baseline selects by the silhouette
     # surrogate, whose tolerance `delta` PROTOCOL §2 leaves null and requires to refuse.
     # B and C carry no null constant, which is why they are runnable now and A is not.
-    if (cfg.get("features") or {}).get("A"):
+    a_on = bool((cfg.get("features") or {}).get("A"))
+    delta = read_delta()
+    if a_on and delta is None:
         raise ContractViolation(
             "feature A is not runnable here: it is a rank-selection feature and BOTH arms "
             "need a selector, while `delta` is null and §2 requires the selector to refuse. "
             "Setting delta is a protocol v1.1 event on development controls (P1-01)."
         )
     if config not in ablation["matched_budget_factorial"]["fixed_rank_configurations"]:
-        raise ContractViolation(
-            f"{config} is not a fixed-rank configuration; only "
-            f"{ablation['matched_budget_factorial']['fixed_rank_configurations']} can run "
-            "while the selector refuses"
-        )
+        if not (a_on and delta is not None and config in ("100", "101", "110", "111")):
+            raise ContractViolation(
+                f"{config} is not a fixed-rank configuration; only "
+                f"{ablation['matched_budget_factorial']['fixed_rank_configurations']} can run "
+                "while the selector refuses"
+            )
     # A matched-budget comparison is only matched if a budget was actually set.
     if _arm(cfg) == "matched_budget" and not _cell_budget(cfg):
         raise ContractViolation(
@@ -243,6 +283,22 @@ def check_preconditions(cfg, ablation):
             raise ContractViolation(
                 f"config simulation.{key}={got} but scenarios.py gives {want}. Two sources "
                 "of truth for the same number have diverged."
+            )
+    # D020 sub-problem 6, closed-form half: under matched_budget with A on, the inner
+    # fits draw from inner-training pools smaller than the outer pool, so a budget
+    # that fits the outer pool may not fit an inner one. With no per-donor variance
+    # the smallest inner pool is closed-form (striping bounds); refuse early. With
+    # variance there is no closed form and run()'s exact post-simulate check governs.
+    if a_on and _arm(cfg) == "matched_budget":
+        floor = _guaranteed_inner_train_cells(
+            params, cfg["validation"]["outer_donor_folds"],
+            cfg["validation"]["inner_donor_folds"])
+        if floor is not None and int(_cell_budget(cfg)) > floor:
+            raise ContractViolation(
+                f"cell_budget {int(_cell_budget(cfg))} exceeds the guaranteed smallest "
+                f"inner-training pool ({floor} cells). An inner fit would draw from a "
+                "pool smaller than its budget. Size the A-comparison budget to the "
+                "inner fraction (D020)."
             )
     return params
 
@@ -318,6 +374,25 @@ def run(config_path, out_root, run_id=None, dry_run=False):
 
     folds = outer_donor_folds(donors, cfg["validation"]["outer_donor_folds"], cfg["seed"])
     results, experiments, diagnostics = [], [], []
+
+    # D020 sub-problem 6, exact half: the closed-form check in check_preconditions
+    # covers only zero-variance donor sizes. With per-donor variance (or real data)
+    # the smallest inner-training pool is measured here, on the simulated donors,
+    # before any fold writes a row — a budget that cannot fit refuses the run
+    # rather than failing one fold mid-way and leaving partial rows behind it.
+    if bool((cfg.get("features") or {}).get("A")) and _arm(cfg) == "matched_budget":
+        smallest = None
+        for fold in folds:
+            for inner in inner_donor_folds(
+                    fold, cfg["validation"]["inner_donor_folds"], cfg["seed"]):
+                n = int(np.isin(donors, np.asarray(inner.train_donors)).sum())
+                smallest = n if smallest is None else min(smallest, n)
+        if int(_cell_budget(cfg)) > smallest:
+            raise ContractViolation(
+                f"cell_budget {int(_cell_budget(cfg))} exceeds the smallest "
+                f"inner-training pool ({smallest} cells, {fold.outer_split_id} "
+                "lineage). Size the A-comparison budget to the inner fraction (D020)."
+            )
 
     provenance_common = dict(
         protocol_hash=protocol_hash(),
@@ -449,8 +524,25 @@ def _consensus_dictionary(obj, k, g_list, cfg, density_threshold):
     return v_arr, consensus_info
 
 
+def _inner_budget(budget, inner_pool_cells, outer_pool_cells):
+    """Scale the discovery budget to the inner fraction (D020 sub-problem 4).
+
+    Cells, never donors: the ratio is over cell counts, so unequal donors cannot
+    break it — floor(x) <= n whenever x <= n is self-guaranteeing, where a
+    donor-based scaling would need a feasibility check that can genuinely fail.
+    """
+    scaled = (int(budget) * int(inner_pool_cells)) // int(outer_pool_cells)
+    if scaled < 1:
+        raise ContractViolation(
+            f"scaled inner budget is {scaled}: budget {budget} over outer pool "
+            f"{outer_pool_cells} leaves nothing for an inner pool of "
+            f"{inner_pool_cells}. The tier's folds are too small for this budget."
+        )
+    return scaled
+
+
 def _run_inner_fold(inner, adata, raw, donors, gene_names, ranks, cfg, fold_dir,
-                    density_threshold):
+                    density_threshold, outer_index, outer_pool_cells):
     """Fit on ONE inner fold's training donors; score its validation donors per rank.
 
     **This is the table feature A selects on, and nothing else consumes it.** PROTOCOL §1.1
@@ -493,16 +585,58 @@ def _run_inner_fold(inner, adata, raw, donors, gene_names, ranks, cfg, fold_dir,
     # cNMF writes under `output_dir/name/`, so the inner fits land in their own
     # directories and cannot overwrite the outer fold's `nmf_genes_list` or spectra. The
     # leakage suite asserts that separation on the bytes rather than trusting the layout.
+    it0, ic0 = time.perf_counter(), time.process_time()
     inner_dir = os.path.join(fold_dir, "inner")
     os.makedirs(inner_dir, exist_ok=True)
+    inner_index = int(str(inner.inner_split_id).rsplit("_", 1)[-1])
+    train_pos = np.flatnonzero(is_inner_train)
+    genes_file = None
+    if _arm(cfg) == "matched_budget":
+        # ---- D020: the inner fit honours the discovery budget, like the outer one ----
+        #
+        # (1) Drawn whenever the arm is matched_budget, NOT gated on feature B's bit:
+        # mirroring the outer branch, or A×B cells would differ from A×not-B cells in
+        # inner sample size for a reason that is not B. (4) Scaled over CELLS to the
+        # inner fraction. (5) Seeded per (outer, inner) via SeedSequence, mirroring
+        # inner_donor_folds — one seed for every inner fold would draw positional twins.
+        inner_pool = int(is_inner_train.sum())
+        budget = _inner_budget(_cell_budget(cfg), inner_pool, outer_pool_cells)
+        seq = np.random.SeedSequence([int(cfg["seed"]), int(outer_index), inner_index])
+        sample = discovery_sample(
+            [str(c) for c in adata.obs_names[train_pos]],
+            donors[train_pos], budget=budget,
+            equal_per_donor=bool((cfg.get("features") or {}).get("B")),
+            seed=int(seq.generate_state(1)[0]),
+        )
+        chosen = set(sample.cell_ids)
+        sampled = np.array([str(c) in chosen for c in adata.obs_names])
+        # (3) Inner B-ON and B-OFF share one inner G via a panelref fit on the FULL
+        # inner-training pool — mirroring the outer fold's hold_preprocessing_constant
+        # mechanism — or the two arms would select ranks under different universes.
+        ref_path = os.path.join(inner_dir, f"{inner.inner_split_id}_pool_counts.h5ad")
+        adata[is_inner_train].copy().write_h5ad(ref_path)
+        ref = cNMF(output_dir=inner_dir, name=inner.inner_split_id + "_panelref")
+        ref.prepare(counts_fn=ref_path, components=[min(ranks)], n_iter=1,
+                    num_highvar_genes=cfg["factorization"]["num_highvar_genes"],
+                    seed=cfg["seed"], beta_loss=cfg["factorization"]["loss"],
+                    max_NMF_iter=cfg["factorization"]["max_optimizer_iterations"])
+        genes_file = os.path.join(inner_dir, f"{inner.inner_split_id}_G.txt")
+        with open(ref.paths["nmf_genes_list"], encoding="utf-8") as fh:
+            frozen = fh.read().rstrip("\n")
+        with open(genes_file, "w", encoding="utf-8") as fh:
+            fh.write(frozen)
+        fit_rows = sampled
+    else:
+        fit_rows = is_inner_train
     train_path = os.path.join(inner_dir, f"{inner.inner_split_id}_counts.h5ad")
-    adata[is_inner_train].copy().write_h5ad(train_path)
+    adata[fit_rows].copy().write_h5ad(train_path)
 
     obj = cNMF(output_dir=inner_dir, name=inner.inner_split_id)
     obj.prepare(
         counts_fn=train_path, components=list(ranks),
         n_iter=cfg["factorization"]["optimizer_starts"],
         num_highvar_genes=cfg["factorization"]["num_highvar_genes"],
+        genes_file=genes_file,
         seed=cfg["seed"], beta_loss=cfg["factorization"]["loss"],
         max_NMF_iter=cfg["factorization"]["max_optimizer_iterations"],
     )
@@ -512,8 +646,11 @@ def _run_inner_fold(inner, adata, raw, donors, gene_names, ranks, cfg, fold_dir,
     with open(obj.paths["nmf_genes_list"], encoding="utf-8") as fh:
         g_list = fh.read().rstrip("\n").split("\n")
     g_pos = np.array([gene_names.index(g) for g in g_list])
-    train_pos = np.flatnonzero(is_inner_train)
-    s_g = training_gene_scale(raw[np.ix_(train_pos, g_pos)])
+    # (2) s_g on the SAMPLED rows, never the full inner-training rows: a gene with
+    # zero variance across the sample but not the pool would pass training_gene_scale's
+    # guard and cNMF would silently emit NaN with only a printed warning.
+    fit_pos = np.flatnonzero(fit_rows)
+    s_g = training_gene_scale(raw[np.ix_(fit_pos, g_pos)])
 
     panel = gene_panel(g_list, cfg["validation"]["inference_gene_fraction"],
                        cfg["validation"]["panel_seed"])
@@ -544,7 +681,10 @@ def _run_inner_fold(inner, adata, raw, donors, gene_names, ranks, cfg, fold_dir,
             "mask_id": panel.mask_id,
             "gene_panel_G": cell_set_hash(g_list),
         })
-    return scores
+    # D020 sub-problem 7: inner cost is timed here, outside the outer fit's window,
+    # and the caller folds it into the shared fit-scope row (D024's argument — like
+    # the outer fit it serves every candidate rank and belongs to no single one).
+    return scores, time.perf_counter() - it0, time.process_time() - ic0
 
 
 def _score_with_panel(panel, g_list, raw_test_g, test_donors_all, v_arr, s_g):
@@ -721,6 +861,61 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
     diagnostics[0]["panel_variance_by_k"] = {}
     fit_wall += time.perf_counter() - diag_t0
     fit_cpu += time.process_time() - diag_c0
+
+    # ---- feature A: inner-validation rank selection (P1-02) ----
+    #
+    # Runs only when the A bit is on. Both selectors read already-computed or
+    # inner-fitted quantities — the outer candidate fits above are untouched, so
+    # fixed-rank rows from an A-ON run are the same measurements an A-OFF run at
+    # the same budget would write (asserted by test, not by inspection).
+    a_selection = None
+    if bool((cfg.get("features") or {}).get("A")):
+        from .selector import select_rank, select_rank_predictive
+
+        outer_index = int(str(fold.outer_split_id).rsplit("_", 1)[-1])
+        outer_pool_cells = int(is_train.sum())
+        inner_folds = inner_donor_folds(
+            fold, cfg["validation"]["inner_donor_folds"], cfg["seed"])
+        inner_scores_all, inner_wall, inner_cpu = [], 0.0, 0.0
+        for inner in inner_folds:
+            scores, w, c = _run_inner_fold(
+                inner, adata, raw, donors, gene_names, ranks, cfg, fold_dir,
+                density_threshold,
+                outer_index=outer_index, outer_pool_cells=outer_pool_cells)
+            inner_scores_all.extend(scores)
+            inner_wall += w
+            inner_cpu += c
+        # D020 sub-problem 7: like the outer fit and the silhouette sweep, the
+        # inner fits serve every candidate rank and belong to no single one —
+        # folded into the shared fit-scope row below (D024's argument).
+        fit_wall += inner_wall
+        fit_cpu += inner_cpu
+        mean_by_k = {}
+        for k in ranks:
+            ks = [s["heldout_squared_prediction_error_counts_v1"]
+                  for s in inner_scores_all if s["candidate_rank"] == int(k)]
+            if not ks:
+                raise ContractViolation(
+                    f"no inner-validation scores at k={k} in "
+                    f"{fold.outer_split_id}: an inner fold failed silently and the "
+                    "selector would pick from ranks that did not all run."
+                )
+            mean_by_k[int(k)] = float(sum(ks) / len(ks))
+        k_star_a, a_boundary = select_rank_predictive(mean_by_k)
+        base = select_rank(diagnostics[0]["silhouette_by_k"], read_delta())
+        a_selection = {
+            "k_star_a": k_star_a, "a_boundary": a_boundary,
+            "k_star_base": base.selected_rank,
+            "base_sensitivity": base.sensitivity_rank,
+            "base_degenerate": base.selector_degenerate,
+            "base_boundary": base.selector_boundary,
+            "mean_inner_error_by_k": mean_by_k,
+            "inner_scores": inner_scores_all,
+            "inner_wall_seconds": inner_wall, "inner_cpu_seconds": inner_cpu,
+        }
+        diagnostics[0]["inner_selection"] = {
+            k: v for k, v in a_selection.items() if k != "inner_scores"}
+        diagnostics[0]["inner_scores"] = inner_scores_all
     results, experiments = [], []
 
     # ---- fit-scope rows: the shared prepare/factorize/combine cost, attributed once ----
@@ -766,9 +961,12 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
                "marginal consensus+scoring cost only"
                + (f"; discovery={sample.mode},budget={sample.budget},"
                   f"per_donor={sample.per_donor}" if sample else "")),
-        **prov,
+         **prov,
     ))
 
+    # Per-rank evaluated values, retained so the selected-rank emission below
+    # reuses the fixed-rank fits bit-for-bit instead of refitting or rescoring.
+    scored = {}
     for k in ranks:
         t1, c1 = time.perf_counter(), time.process_time()
         dt_repl = str(density_threshold).replace(".", "_")
@@ -828,6 +1026,15 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
         usage_err, _ = usage_error(
             np.asarray(ds.true_usages, dtype=np.float64)[test_rows[keep]], u, alignment)
         wall, cpu = time.perf_counter() - t1, time.process_time() - c1
+        scored[int(k)] = {
+            "loss_train_scale": np.asarray(loss_train_scale),
+            "loss_counts": np.asarray(loss_counts),
+            "loss_null": np.asarray(loss_null),
+            "recovery": float(recovery), "recovery_null": float(recovery_null),
+            "usage_err": float(usage_err),
+            "artifact": os.path.relpath(obj.paths["consensus_spectra"] % (k, dt_repl), root),
+            "consensus_info": consensus_info,
+        }
 
         exp_id = make_experiment_id(_configuration(cfg), _arm(cfg), dataset_id, fold.outer_split_id, k,
                                     {"seed": cfg["seed"],
@@ -905,6 +1112,99 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
                    + (f"; discovery={sample.mode},budget={sample.budget}" if sample else "")),
             **prov,
         ))
+
+    # ---- selected-rank evaluations (P1-02): the 000-vs-100 comparison ----
+    #
+    # Both arms evaluate the SAME outer candidate fits scored above — A changes
+    # which rank is read off, never how a fit is computed. The A-ON arm reads the
+    # inner-validation minimum; the paired A-OFF baseline reads the silhouette
+    # surrogate on the identical bank, panel, scale and test cells, so the pairing
+    # is by construction rather than by matching runs afterwards. Baseline rows
+    # carry the A bit cleared (`100`→`000`) with feature_A=false: that is what a
+    # 000 run with the baseline selector would have written, from the same fits.
+    # No new compute happens here, so marginal cost is zero on both files (the
+    # selection cost already sits on the fit-scope row); reusing the stored
+    # per-cell arrays keeps every value bitwise identical to its fixed-rank row.
+    if a_selection is not None:
+        base_sel = a_selection["k_star_base"]
+        if base_sel is None:
+            raise ContractViolation(
+                f"baseline selector returned no rank in {fold.outer_split_id}: "
+                "every candidate K failed and there is no selected-rank baseline "
+                "to pair against A."
+            )
+        clear_a = {"100": "000", "101": "001", "110": "010", "111": "011"}
+        for k_star, sel_config, sel_a_bit, sel_note in (
+            (a_selection["k_star_a"], _configuration(cfg), _bit(cfg, "A"),
+             f"A selector: min inner-validation loss (boundary={a_selection['a_boundary']})"),
+            (int(base_sel), clear_a.get(_configuration(cfg), _configuration(cfg)), "false",
+             "baseline selector: largest-among-stable silhouette (v1.1 delta)"),
+        ):
+            b = scored[int(k_star)]
+            sel_id = make_experiment_id(
+                sel_config, _arm(cfg), dataset_id, fold.outer_split_id, k_star,
+                {"seed": cfg["seed"], "panel_seed": cfg["validation"]["panel_seed"]},
+                variant=cfg.get("variant"), selected_rank=k_star)
+            sel_common = dict(experiment_id=sel_id, configuration=sel_config,
+                              arm=_arm(cfg), dataset_id=dataset_id,
+                              outer_split_id=fold.outer_split_id,
+                              candidate_rank=k_star, selected_rank=k_star,
+                              status="ok_provisional", artifact_path=b["artifact"])
+            for metric, per_cell in (
+                ("heldout_squared_prediction_error_v1", b["loss_train_scale"]),
+                ("heldout_squared_prediction_error_counts_v1", b["loss_counts"]),
+                ("null_squared_prediction_error_v1", b["loss_null"]),
+            ):
+                agg = equal_donor_mean(per_cell, test_donors)
+                for donor, val in sorted(agg.per_donor.items()):
+                    n_cells = int((test_donors == donor).sum())
+                    results.append(result_row(
+                        **sel_common, independent_unit_id=donor,
+                        independent_unit_type="donor",
+                        metric=metric, value=repr(val), evaluation_scope="per_donor",
+                        n_eligible_units=n_cells, n_failed_units=0,
+                    ))
+                results.append(result_row(
+                    **sel_common, independent_unit_id="ALL_TEST_DONORS",
+                    independent_unit_type="donor", metric=metric, value=repr(agg.value),
+                    evaluation_scope="equal_donor_mean",
+                    n_eligible_units=agg.n_eligible_donors, n_failed_units=agg.n_failed_donors,
+                ))
+            for metric, value in (("program_recovery_cosine_v1", b["recovery"]),
+                                  ("usage_error_v1", b["usage_err"])):
+                results.append(result_row(
+                    **sel_common, independent_unit_id=sel_id,
+                    independent_unit_type="experiment",
+                    metric=metric, value=repr(value), evaluation_scope="experiment",
+                    n_eligible_units=1, n_failed_units=0,
+                ))
+            sel_cost = _cost(0.0, 0.0, _peak_mb(), 0)
+            results.extend(_cost_result_rows(sel_cost, sel_common, sel_id))
+            experiments.append(experiment_row(
+                experiment_id=sel_id, prototype="true", feature_A=sel_a_bit,
+                feature_B=_bit(cfg, "B"), feature_C=_bit(cfg, "C"), arm=_arm(cfg),
+                status="completed",
+                evidence_tier=cfg["evidence_tier"], dataset_id=dataset_id,
+                dataset_manifest_hash=ds.dataset_manifest_hash, simulation_replicate=0,
+                outer_split_id=fold.outer_split_id, inner_split_id="",
+                mask_id=panel.mask_id,
+                sampling_replicate=0, optimizer_seed=cfg["seed"], candidate_rank=k_star,
+                selected_rank=k_star, discovery_cells_hash=discovery_hash,
+                factor_bank_hash=artifact_hash(obj.paths["merged_spectra"] % k_star),
+                preprocessing_hash=pre_hash,
+                artifact_dir=os.path.relpath(fold_dir, root), command=" ".join(sys.argv),
+                started_utc=started, finished_utc=_utc(), exit_code=0,
+                wall_seconds=repr(sel_cost["wall_seconds_v1"]),
+                cpu_seconds=repr(sel_cost["cpu_seconds_v1"]),
+                peak_memory_mb=repr(sel_cost["peak_memory_mb_v1"]),
+                memory_scope=MEMORY_SCOPE, failure_reason="",
+                notes=(f"provisional={','.join(touched())}; arm={_arm(cfg)}; "
+                       f"{sel_note}; evaluation reuses the fixed-rank fit at "
+                       f"k={k_star}, zero marginal cost; "
+                       f"program_recovery_matched_null={b['recovery_null']!r}"
+                       + (f"; {b['consensus_info']}" if b["consensus_info"] else "")),
+                **prov,
+            ))
 
     return {"results": results, "experiments": experiments, "diagnostics": diagnostics}
 

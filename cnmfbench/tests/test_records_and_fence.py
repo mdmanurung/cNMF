@@ -61,12 +61,13 @@ def test_a_direction_contradicting_the_vocabulary_is_rejected():
         R.result_row(**_ok_result(direction="higher_is_better"))
 
 
-def test_selected_rank_must_be_null_on_a_fixed_rank_row():
-    """§5.3. A non-null value here would be the baseline selector running while `delta`
-    is null, which §2 requires to refuse."""
+def test_selected_rank_null_on_fixed_rank_selected_on_selected_rank():
+    """§5.3 as of v1.1 (P1-02): fixed-rank rows leave `selected_rank` null; a
+    selected-rank row evaluates the selected rank, so the two must agree."""
     assert R.result_row(**_ok_result())["selected_rank"] == ""
-    with pytest.raises(ValueError, match="selected_rank must be null"):
-        R.result_row(**_ok_result(selected_rank=3))
+    assert R.result_row(**_ok_result(selected_rank=3))["selected_rank"] == "3"
+    with pytest.raises(ValueError, match="selected_rank.*!= candidate_rank"):
+        R.result_row(**_ok_result(selected_rank=4))
 
 
 def test_none_like_strings_are_rejected_but_a_true_null_is_kept():

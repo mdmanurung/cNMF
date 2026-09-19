@@ -695,6 +695,48 @@ file). `select_rank` production use remains gated on P1-02's caller.
 Protocol/data versions superseded: v1.0.1 → v1.1. No rows exist under v1.1 yet.
 Independent confirmation needed: no (development-tier calibration).
 
+## D034 — P1-02: the A switch — inner loop honours the budget, both selectors emit
+
+Date/time: 2026-09-19, P1-02 session
+Type: implementation
+Related task, feature, gate: P1-02, feature A, D020
+Context: `_run_inner_fold` existed but ignored `arm: matched_budget` (D020's
+named inconsistency) and had no production caller; `check_preconditions`
+refused A unconditionally; rows could not carry a selected rank.
+Decision and build:
+- D020 sub-problems 1–7 implemented: sampling whenever the arm is
+  matched_budget regardless of B's bit (1); `s_g` on sampled rows (2); inner
+  panelref sharing one inner G across B arms (3); cells-based budget scaling
+  `_inner_budget` (4); `SeedSequence([seed, outer, inner])` sampling seeds (5);
+  closed-form budget refusal in `check_preconditions` plus the exact
+  post-simulate check in `run()` refusing before any row is written (6); inner
+  wall/cpu folded into the shared fit-scope row per D024 (7).
+- `read_delta()` reads the frozen §2 constant from PROTOCOL.md (hash already
+  verified by the gate); A-bit configs (100/101/110/111) admitted iff delta is
+  set, otherwise the §2 refusal stands.
+- Selection: A-ON reads `select_rank_predictive` (min mean inner error, ties
+  to smaller K); the paired baseline reads `select_rank` on the identical
+  bank/panel/scale (emitted as configuration-000 rows with feature_A=false —
+  what a 000 run with the baseline selector would have written, paired by
+  construction). Selected rows reuse stored per-cell arrays (zero marginal
+  cost, selection cost on the fit-scope row); `selected_rank` must equal
+  `candidate_rank`; `experiment_id` folds it in only when set (D014 pattern —
+  all fixed-rank ids pinned bit-identical by test).
+- New A-pair configs at inner-fitting budgets: `smoke_{000,100}ab48`
+  (variant ab48), `development_{000,100}ab960` (variant ab960).
+Evidence paths and experiment IDs: `cnmfbench/tests/test_selection_a.py`
+(11 tests: admission, closed-form refusal, cells-scaling, id pinning,
+SMOKE A-ON selection+pairing+leakage, A-ON/A-OFF fit equivalence);
+`python -m pytest cnmfbench -q` → 275 passed.
+Trade-offs and negative evidence: `splits.outer_donor_folds` stays fenced —
+D021 needs a real (non-test) A-ON run, which is P1-03, not a test-suite run.
+The equivalence test compares evaluation values only (cost rows differ by
+design: inner cost sits on the A-ON fit-scope row).
+Consequences: feature A runnable; first real A-ON runs (P1-03) un-fence the
+inner loop. No `src/cnmf/**` change; no tracked-row change.
+Protocol/data versions superseded: none (v1.1 rules applied, not altered).
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>

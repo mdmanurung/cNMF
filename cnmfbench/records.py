@@ -100,7 +100,7 @@ ARM = ("full_training_pool", "matched_budget", "upstream_full_data", "genenmf_na
 
 
 def make_experiment_id(configuration, arm, dataset_id, outer_split_id, candidate_rank, seeds,
-                       variant=None, inner_split_id=None):
+                       variant=None, inner_split_id=None, selected_rank=None):
     """Readable and deterministic. Same inputs ⇒ same id ⇒ a re-run is detectable.
 
     The trailing 12 hex characters disambiguate runs that differ only in seeds. §7's
@@ -123,11 +123,9 @@ def make_experiment_id(configuration, arm, dataset_id, outer_split_id, candidate
 
     **`inner_split_id` exists for the same reason, pre-emptively (D020 sub-problem 8).**
     `_run_inner_fold` fits and scores per `(outer_split_id, inner_split_id, candidate_rank)`,
-    but none of those three vary across two inner folds of the same outer fold at the same
+    but     none of those three vary across two inner folds of the same outer fold at the same
     rank without it — two such inner folds would collide on `experiment_id` today, exactly
-    the way the `variant` docstring above describes for a different axis. Not yet exercised
-    by any caller (feature A cannot run while `delta` is null, §2), so this only prevents the
-    collision from being discovered by a production run instead of by design. Folded into the
+    the way the `variant` docstring above describes for a different axis. Folded into the
     digest **only when set**, so every id written before it existed stays valid.
     """
     payload = {
@@ -141,10 +139,18 @@ def make_experiment_id(configuration, arm, dataset_id, outer_split_id, candidate
         payload["variant"] = str(variant)
     if inner_split_id:
         payload["inner_split_id"] = str(inner_split_id)
+    if selected_rank not in (None, ""):
+        # A selected-rank row evaluates the selected rank; a fixed-rank row with
+        # the same candidate rank is a different experiment (D020's identity
+        # invariant: same id ⇒ same experiment). Folded in only when set, so
+        # every fixed-rank id written before P1-02 stays bit-identical.
+        payload["selected_rank"] = int(selected_rank)
     digest = parameter_hash(payload)
     rank = "fit" if candidate_rank is None else f"k{int(candidate_rank)}"
     label = f"{dataset_id}-{variant}" if variant else dataset_id
     label = f"{label}-{inner_split_id}" if inner_split_id else label
+    if selected_rank not in (None, ""):
+        label = f"{label}-sel{int(selected_rank)}"
     return f"{configuration}-{arm}-{label}-{outer_split_id}-{rank}-{digest[:12]}"
 
 
@@ -185,14 +191,19 @@ def result_row(**kw):
     if kw.get("arm") not in ARM:
         raise ValueError(f"arm {kw.get('arm')!r} not in {ARM}")
 
-    # §5.3: fixed-rank arms leave selected_rank null with a success status. A non-null
-    # value here would be the baseline selector running while `delta` is null (§2).
-    if kw.get("selected_rank") not in (None, ""):
-        raise ValueError(
-            "selected_rank must be null this session: every A-OFF configuration is in "
-            "fixed_rank_configurations, `delta` is null, and §2 requires the selector to "
-            "refuse rather than return a rank."
-        )
+    # §5.3: fixed-rank arms leave selected_rank null with a success status. A
+    # selected-rank row (P1-02: the rank the arm's assigned selector chose,
+    # evaluated at exactly that rank) carries selected_rank == candidate_rank.
+    # Anything else — a selected rank that was not the evaluated rank — is refused,
+    # because it would describe an evaluation that never happened.
+    selected = kw.get("selected_rank")
+    if selected not in (None, ""):
+        if str(selected) != str(kw.get("candidate_rank")):
+            raise ValueError(
+                f"selected_rank {selected!r} != candidate_rank "
+                f"{kw.get('candidate_rank')!r}: a selected-rank row evaluates the "
+                "selected rank, never another rank."
+            )
     kw.setdefault("metric_definition_version", METRIC_DEFINITION_VERSION)
     kw.setdefault("stratum", "all")
     kw.setdefault("selected_rank", None)

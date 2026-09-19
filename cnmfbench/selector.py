@@ -20,7 +20,7 @@ from typing import Mapping, Optional, Tuple
 
 from .contract import ContractViolation
 
-__all__ = ["SelectionResult", "select_rank"]
+__all__ = ["SelectionResult", "select_rank", "select_rank_predictive"]
 
 
 @dataclass(frozen=True)
@@ -131,3 +131,31 @@ def select_rank(silhouette_by_k: Mapping[int, float], delta: Optional[float]) ->
         selector_degenerate=False, selector_boundary=boundary,
         n_failed_units=n_failed, eligible_grid=grid,
     )
+
+
+def select_rank_predictive(mean_inner_error_by_k):
+    """Feature A's selector (P1-02): minimum donor-averaged inner-validation loss.
+
+    `mean_inner_error_by_k`: mapping {candidate_rank: mean over inner folds of
+    the fold's equal-donor-mean held-out error}. Lower wins; exact ties go to
+    the smaller K deterministically (IMPLEMENTATION_PROMPT.md P1: "deterministic
+    preference for smaller K among exact/numerically defined ties"). No `delta`,
+    no silhouette — this rule reads only inner-validation results, and the
+    candidate fits, preprocessing, masks and aggregation are the caller's
+    unchanged business.
+
+    Returns `(k_star, boundary)` where `boundary` flags a grid endpoint (never
+    auto-expands). Raises `ContractViolation` on an empty grid rather than
+    returning a rank for a selection that never ran.
+    """
+    grid = tuple(sorted(mean_inner_error_by_k))
+    if not grid:
+        raise ContractViolation(
+            "feature A's selector received no inner-validation scores: every "
+            "inner fold failed or the grid is empty. Returning a rank here would "
+            "be selecting on nothing."
+        )
+    best = min(mean_inner_error_by_k[k] for k in grid)
+    candidates = [k for k in grid if mean_inner_error_by_k[k] == best]
+    k_star = min(candidates)
+    return int(k_star), bool(k_star == grid[0] or k_star == grid[-1])

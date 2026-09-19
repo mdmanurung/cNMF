@@ -7,15 +7,11 @@ it is hardened by the path that uses it actually running. So every test here cal
 `skeleton._run_inner_fold` — the production helper — against real `prepare/factorize/
 combine/consensus`, and asserts on bytes read back off disk.
 
-**Why this path has no production caller yet, stated plainly.** PROTOCOL §1.1 is explicit
-that the A-OFF baseline selector reads `silhouette` and `prediction_error` from
-`k_selection_stats`, computed by `consensus(skip_density_and_return_after_stats=True)` *on
-the training fit itself* — "both inputs already exist on disk after a rank sweep; the
-selector computes nothing new" (`PROTOCOL.md:48`). The A-OFF baseline never reads an inner
-validation fold. So the inner loop runs only when A is on, and `check_preconditions`
-(`skeleton.py:192`) still refuses A while `delta` is null. Until P0-06 sets `delta`, these
-tests are the only thing that executes `_run_inner_fold`, and they are written to be a real
-execution of it rather than a stand-in for one.
+**Production caller.** Since P1-02, `_run_fold`'s A-branch calls this helper with
+`outer_index` and `outer_pool_cells` for the D020 budget scaling; these tests
+call it the same way (arm `full_training_pool` here, so the budget path is
+inactive but the signature is the production one). The A-OFF baseline still
+never reads an inner validation fold (PROTOCOL §1.1).
 
 **The two failures this file is shaped around.**
 
@@ -74,11 +70,15 @@ def _fit_inner(cfg, ds, fold, inner, fold_dir):
     donors = np.asarray(ds.adata.obs["donor_id"]).astype(str)
     raw = np.asarray(ds.adata.X, dtype=np.float64)
     gene_names = list(ds.adata.var_names)
-    return skeleton._run_inner_fold(
+    outer_index = int(str(fold.outer_split_id).rsplit("_", 1)[-1])
+    outer_pool_cells = int(np.isin(donors, np.asarray(fold.train_donors)).sum())
+    scores, _, _ = skeleton._run_inner_fold(
         inner, ds.adata, raw, donors, gene_names,
         cfg["factorization"]["candidate_ranks"], cfg, fold_dir,
         cfg["factorization"]["density_threshold"],
+        outer_index=outer_index, outer_pool_cells=outer_pool_cells,
     )
+    return scores
 
 
 @pytest.fixture(scope="module")
