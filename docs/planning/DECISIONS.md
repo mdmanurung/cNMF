@@ -528,6 +528,68 @@ dependency on P0-02 is now satisfied.
 Protocol/data versions superseded: none. PROTOCOL.md stays v1.0.1.
 Independent confirmation needed: no.
 
+## D029 — P0-08 DONE: Kang 2018 registered; AIDA/Heart as characterised reserves
+
+Date/time: 2026-09-19, P0-08 session
+Type: implementation
+Related task, feature, gate: P0-08, gate P0
+Context: four prior sessions fetched and characterised candidates (commits
+`7725827`, `d9c28da`, `3c10c12`, `069994c`, `28818f5`) but never closed the
+ledger row. The evidence already exists in
+`docs/benchmarks/registry/p0-08_real_data_candidates.tsv`; this session
+verifies rather than repeats it.
+Decision: register **Kang 2018** as the public multi-donor dataset —
+origin GEO GSE96583 via the pertpy scverse mirror
+`https://exampledata.scverse.org/pertpy/kang_2018.h5ad`, sha256
+`e6a5adac64dcdeb36eaba27db49b63e0c64bb0ed4a64c6705971506b41c39830`
+(**re-verified by re-hash this session, match**), 24,673 cells × 15,706 genes,
+donor mapping via the `replicate` column (8 donors, 1,042–5,090 cells each),
+stim/ctrl label per cell (12,358/12,315). AIDA v2 (625 donors, single assay)
+and Heart snRNA slice (14 donors) stay characterised reserves with their
+confounds recorded (site-nested-in-country; kit-nested-in-donor); Stephenson
+pertpy distribution is NOT USABLE (log1p-normalised, counts absent).
+License caveat (unchanged from the TSV): Kang's terms recorded as the user's
+2026-09-18 statement ("MIT"), NOT independently verified; Heart CC BY 4.0 read;
+confirm before external publication, local runs unaffected.
+Evidence paths and experiment IDs: the TSV (§Kang verdict + donor table +
+interferon diagnostic, AUC 0.914–0.948 at every rank, 16/30 ISGs pre-listed);
+`sha256sum` match this session; run dir
+`/exports/para-lipg-hpc/mdmanurung/cnmf-realdata/kang_run/` (ad-hoc diagnostic,
+no tracked rows by design).
+Trade-offs and negative evidence: 8 donors is thin for feature A (the TSV says
+so itself — donor count dominates per D008, so Kang cannot test A's premise);
+Kang's role is activity-program recovery with a labelled ground truth, not rank
+selection. No benchmark row has used real data yet — registration is done,
+biological confirmation is not claimed.
+Consequences for the baseline and active feature set: none algorithmic.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no (registration, not a result).
+
+## D030 — P0-09 BLOCKED: no R on this host, GeneNMF comparator unavailable
+
+Date/time: 2026-09-19, P0-09 session
+Type: implementation / deviation (external blocker)
+Related task, feature, gate: P0-09, gate P0
+Context: P0-09 needs the pinned GeneNMF R workflow plus an R smoke result and
+conversion tests. Checked this session: no `Rscript` on PATH, no `/usr/lib/R`,
+`module spider R` / `rlang` / `Rscript` all resolve to nothing R-related. An R
+comparator cannot be built or tested here.
+Options considered: (a) install R locally; (b) record BLOCKED with the exact
+failed commands and keep the task open for a host with R.
+Decision: **(b).** Installing an R stack (plus RcppML + GeneNMF deps) into the
+locked `cnmf_bench` environment would change `environment_hash`, the recorded
+provenance on all tracked rows — the same reason pertpy was deliberately not
+installed at P0-08. Per the ledger footnote, P0-09 stays BLOCKED (never becomes
+DONE by redefinition) and the P0 gate documents no-comparator scope.
+Evidence paths and experiment IDs: `which R Rscript` (both absent);
+`module spider Rscript` → "Unable to find"; `ls /usr/lib/R` → absent.
+Trade-offs and negative evidence: whole-workflow GeneNMF comparisons
+(`genenmf_native` anchor) are unavailable until an R host appears; factorial
+A/B/C claims are unaffected since they never involve GeneNMF.
+Consequences for the baseline and active feature set: none.
+Protocol/data versions superseded: none.
+Independent confirmation needed: re-check on any new host before unblocking.
+
 ## Entry template
 
 ### D<id> — <title>
