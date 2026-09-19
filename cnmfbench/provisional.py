@@ -51,19 +51,6 @@ PROVISIONAL = {
     c.component_id: c
     for c in [
         ProvisionalComponent(
-            component_id="splits.outer_donor_folds",
-            owner_task="P0-06",
-            reason="Reassigned from P0-05 at D021. The nesting this entry originally "
-            "required now exists (`inner_donor_folds`), is property-tested, and is "
-            "exercised against real cNMF fits in `test_inner_folds.py`. But no production "
-            "run calls it: `check_preconditions` refuses feature A while `delta` is null "
-            "(§2), so the inner loop's only caller today is the test suite. Un-fencing it "
-            "here would repeat D017 — a component declared hardened while the path that "
-            "would exercise it in production does not run.",
-            hardening_requires="`delta` set (P0-06) and feature A runnable, so the inner "
-            "loop is exercised by a real run rather than by tests alone.",
-        ),
-        ProvisionalComponent(
             component_id="features.consensus_c",
             owner_task="P3-01",
             reason="Feature C reimplements upstream's consensus aggregation harness-side, "

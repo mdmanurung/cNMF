@@ -769,6 +769,64 @@ be harder-but-possible independent of this gate.
 Protocol/data versions superseded: none.
 Independent confirmation needed: no (development-tier feasibility, not adoption).
 
+## D036 — First real A-ON run un-fences the inner loop; A overselects to the boundary
+
+Date/time: 2026-09-19, P1-03 session
+Type: implementation + scientific finding
+Related task, feature, gate: P1-03, P1-04, feature A
+Context: D021's un-fencing condition (`delta` set *and* feature A exercised by
+a real run) became satisfiable at v1.1 + P1-02. Run `p1-03-dev-100ab960`
+(818 results / 20 experiments, exit 0, both outer folds) is that run:
+`@provisional("splits.outer_donor_folds")` (both decorators — outer and inner
+share the id and un-fence together) and its registry entry are deleted here.
+Fence goes three → two (`features.consensus_c` P3-01, `features.discovery_sample_b`
+P2-01). `test_calling_a_provisional_component_records_it` now exercises
+`discovery_sample_b`.
+Finding (tracked rows, base pair): baseline selects 7=K_true in both folds
+(confirming the pre-registered δ window in production); A selects 10
+(boundary) in outer_0 and 7 in outer_1. Inner curves: outer_0 min at K=10
+(1351.3) vs 1353.6 at K=7 — flat within 0.2%, argmin walks to the edge.
+Prediction Δ +1.07/0.0 (margin 30: no gain); recovery harm 0.299/0.0
+(margin 0.01: exceeded outer_0); usage harm 0.153/0.0 (margin 0.05: exceeded
+outer_0); cost 2.6×/2.2× (cap 25×: pass). A_weak pair queued next.
+Evidence paths and experiment IDs: `results/exploratory/p1-03-dev-100ab960/`
+(inner_selection in diagnostics.json); merged rows in tracked TSVs
+(5886/172 after the base pair).
+Trade-offs and negative evidence: un-fencing on one real run is thin — stated;
+the A_weak pair (running) exercises it further, and any pathology there
+re-opens this, it does not retroactively break the gate logic.
+Consequences: P1-03 continues (A_weak); P1-04 judges.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
+## D037 — P1-04: feature A DROPPED at DEVELOPMENT (no gain, real harm)
+
+Date/time: 2026-09-19, P1-04 session
+Type: scientific adoption
+Related task, feature, gate: P1-04, gate P1, feature A
+Context: first milestone prototype complete — 000 vs 100 on 4 DEVELOPMENT
+folds (base_identifiable + A_weak, shared budgets, paired fits). Full evidence
+in `docs/planning/gates/P1.md`.
+Decision: **DROP.** Primary: no fold reaches gain margin 30 (best 0.0).
+Safeguards: recovery harm exceeds 0.01 in 3/4 folds (0.299, 0.043, 0.169),
+usage harm exceeds 0.05 in the same 3 folds. Cost passes (≤2.6× vs 25× cap);
+rare-recovery NOT_SET blocks adoption independently. Mechanism: min-loss inner
+validation has no parsimony pressure and follows flat-curve noise to the grid
+edge (K*=10 boundary in 3/4 folds); the silhouette baseline found K_true in
+2/2 base folds. The 1-SE parsimony variant is named, not built. Scope:
+DEVELOPMENT simulation only; B/C comparisons proceed untouched on fixed-rank
+rows. Default remains OFF.
+Evidence paths and experiment IDs: gate P1; tracked TSVs (5886+ rows incl.
+both pairs); run dirs `p1-03-dev-{000,100}ab960{,-aweak}`.
+Trade-offs and negative evidence: n=2 folds × 2 regimes is thin and the
+feasibility NO-GO (D035) keeps "benchmark unresolving" live for nulls — but
+the harm folds are active overselection, not nulls, so the DROP does not rest
+on resolvability. A_weak (the designed headroom regime) confirmed the harm
+instead of reversing it.
+Consequences: feature A stays OFF; P2-01 next.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no (DROP on development evidence; nothing promoted).
+
 ## Entry template
 
 ### D<id> — <title>

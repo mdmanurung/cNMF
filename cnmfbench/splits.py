@@ -23,7 +23,6 @@ import numpy as np
 from . import PROTOCOL_VERSION
 from .contract import ContractViolation
 from .hashing import cell_set_hash, parameter_hash
-from .provisional import provisional
 
 __all__ = [
     "DonorFold",
@@ -61,7 +60,6 @@ def _held_out_blocks(donor_ids, n_folds, rng):
     return donors, [sorted(shuffled[i::n_folds]) for i in range(n_folds)]
 
 
-@provisional("splits.outer_donor_folds")
 def outer_donor_folds(donor_ids, n_folds, seed):
     """Partition unique donors into `n_folds` blocks; each donor is a test donor once.
 
@@ -85,7 +83,6 @@ def outer_donor_folds(donor_ids, n_folds, seed):
     return folds
 
 
-@provisional("splits.outer_donor_folds")
 def inner_donor_folds(outer_fold, n_folds, seed):
     """Split ONE outer fold's training donors into inner training/validation folds.
 
@@ -112,9 +109,8 @@ def inner_donor_folds(outer_fold, n_folds, seed):
     its own (different) donors, which is not wrong but makes "unrelated inner folds"
     (`IMPLEMENTATION_PROMPT.md:192`) less unrelated than that clause assumes.
 
-    Note the `@provisional` id is shared with `outer_donor_folds`: the fence entry's
-    `hardening_requires` is "Nested outer/inner donor folds", i.e. this function IS that
-    component's hardening, and the two are un-fenced together or not at all.
+    (Un-fenced at P1-03 (D036): `delta` set under v1.1 and feature A exercised
+    by the first real A-ON run, the production-caller evidence D021 required.)
     """
     outer_index = int(str(outer_fold.outer_split_id).rsplit("_", 1)[-1])
     seq = np.random.SeedSequence([int(seed), outer_index])

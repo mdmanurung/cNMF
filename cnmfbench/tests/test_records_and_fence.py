@@ -194,7 +194,12 @@ def test_shared_fit_cost_is_attributed_exactly_once():
     # content). The id prefix is the one key that carries every distinction.
     by_fold = {}
     for e in experiments:
-        by_fold.setdefault(tuple(e["experiment_id"].split("-")[:-2]), []).append(e)
+        # Drop the rank + digest tail; a selected-rank row's `-selK` segment is
+        # identity for its evaluation, not a new fold — strip it so selected
+        # evaluations group with the fit-scope row whose fit they reuse (P1-02).
+        segs = [s for s in e["experiment_id"].split("-")[:-2]
+                if not (s.startswith("sel") and s[3:].isdigit())]
+        by_fold.setdefault(tuple(segs), []).append(e)
     for fold, rows in by_fold.items():
         fit = [r for r in rows if r["candidate_rank"] == ""]
         per_rank = [r for r in rows if r["candidate_rank"] != ""]
@@ -265,15 +270,17 @@ def test_every_provisional_component_names_a_real_ledger_task():
 
 
 def test_calling_a_provisional_component_records_it():
-    """`splits.gene_panel` and `scoring.nnls_usages` were un-fenced at D021, so a still-
-    fenced component is needed to exercise this. `outer_donor_folds` remains fenced,
-    reassigned to P0-06."""
-    from cnmfbench.splits import outer_donor_folds
+    """A still-fenced component exercises the touched-tracking. (`outer_donor_folds`
+    was un-fenced at D036 after the first real A-ON run; `discovery_sample_b`
+    remains fenced under P2-01.)"""
+    from cnmfbench.features import discovery_sample
 
     P.reset_touched()
     assert P.touched() == ()
-    outer_donor_folds([f"d{i}" for i in range(8)], 2, 1)
-    assert "splits.outer_donor_folds" in P.touched()
+    discovery_sample(
+        [f"cell_{i}" for i in range(6)], ["d0"] * 3 + ["d1"] * 3,
+        budget=4, equal_per_donor=True, seed=1)
+    assert "features.discovery_sample_b" in P.touched()
 
 
 def test_cited_rows_check_is_scoped_not_a_whole_file_scan():
