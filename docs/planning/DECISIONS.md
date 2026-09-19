@@ -492,6 +492,42 @@ Consequences for the baseline and active feature set: fence four → three. No
 Protocol/data versions superseded: none. PROTOCOL.md stays v1.0.1.
 Independent confirmation needed: no.
 
+## D028 — P0-02 closes the D006 guard: validation only, no redefinition
+
+Date/time: 2026-09-19, P0-02 session
+Type: implementation
+Related task, feature, gate: P0-02, gate P0
+Context: D006 inverted P0-02/P0-03 and forbade P0-02 from redefining PROTOCOL §6 —
+any inadequacy found would be a versioned amendment, not a schema-layer choice.
+P0-03 then built the simulator against §6, and `contract.py`/`io.py` grew the
+subset of checks the simulator needed to be usable at all. The ledger row stayed
+TODO because three items were still missing: schema tests, manifest examples
+and explicit expression units.
+Options considered: (a) rework `contract.py`/`io.py` into a unified schema
+framework; (b) add only the missing layer — unit tagging (§6.2), manifest-key
+validation with a committed example (§6.6), rank-grid validation (§1.1/§1.4) —
+leaving existing modules and their tests untouched.
+Decision: **(b).** `cnmfbench/schemas.py` adds `ExpressionMatrix` (unit system
+as data, `UnitMismatch` refusal, mirroring D013's `Spectra`), `DATASET_MANIFEST_KEYS`
++ `validate_dataset_manifest`, and `validate_rank_grid`. No existing module was
+edited; §6 was read, not rewritten.
+Evidence paths and experiment IDs: `cnmfbench/schemas.py`;
+`cnmfbench/tests/test_schemas.py` (14 tests — every refusal exercised, plus a
+real `simulate()` manifest and the committed
+`docs/benchmarks/registry/dataset_manifest_example.json` both satisfying the
+schema); `python -m pytest cnmfbench -q` → 261 passed, exit 0.
+Trade-offs and negative evidence: the new validators are not yet wired into
+`skeleton.py` call sites — they are available checks, not enforced gates. Wiring
+them into the runner (e.g. validating the candidate grid in `check_preconditions`,
+tagging `X` at the transform boundary) is a follow-up decision with its own
+blast radius, not smuggled into this commit. `validate_mapping_keys` is a
+two-line helper with no direct test; it is exercised only if a caller adopts it.
+Consequences for the baseline and active feature set: none algorithmic; no
+`src/cnmf/**` change; no tracked-row change. Unblocks P0-08/P0-09, whose
+dependency on P0-02 is now satisfied.
+Protocol/data versions superseded: none. PROTOCOL.md stays v1.0.1.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>
