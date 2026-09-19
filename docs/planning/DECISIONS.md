@@ -650,6 +650,51 @@ amendment (unchanged).
 Protocol/data versions superseded: none.
 Independent confirmation needed: no.
 
+## D033 — v1.1 amendment: seven batched items, thresholds calibrated, A frozen
+
+Date/time: 2026-09-19, P1-01 session
+Type: protocol (amendment v1.0.1 → v1.1)
+Related task, feature, gate: P1-01, P0-06, gate P0
+Context: the single batched amendment (warm-tome plan §7 — "do not version
+PROTOCOL twice"). All seven items below land in one commit with one hash;
+no confirmation exists under any version, so §9's invalidation clause binds
+nothing yet.
+Amendment contents (`cc524107…c9d42ec9`):
+1. `delta = 0.04812` (§2; evidence D026, runs `p06-delta-*`). Refusal spent.
+2. Precision/recall threshold **0.90** (§5.2): midpoint of the DEVELOPMENT
+   separation band — matched null max 0.833, fit min 0.974 over both folds;
+   noise control 0.72–0.75 and deleted dummy 0.0 fall below.
+3. Ambiguous threshold **0.20** (§5.2, new row): K_true gaps ≥0.354 both folds;
+   off-rank gaps reach 0.0003; 0.20 flags the latter with zero K_true alarms.
+4. D009 vocabularies solemnised (§5.4): status/scope/arm strings as enforced.
+5. Instrument-failure branch (§6.7): every future feasibility pre-registration
+   must carry the "criterion was wrong" option D012's menu lacked.
+6. Nested folds + `inner_split_id` (§4.4): inner G/s_g discipline, identity rule.
+7. Primary-loss scope (§3.4, D016): training-scale primary where arms share
+   `s_g` (A, C); count-unit primary where they cannot (B). `contracts/B.md`
+   unchanged.
+Full control distributions: `registry/p1-01_threshold_calibration.tsv`
+(168 rows, both folds, `p04-dev-000m` config-000 controls). Calibration script
+at `/tmp/calibrate_thresholds.py` (scratch, not tracked — rerunnable from the
+TSV + run dirs it cites).
+`contracts/A.md` frozen with margins from the same controls' pilot
+variability: primary 30 (3× donor SE 10.45, mean 422); recovery harm 0.01
+(SE 0.0008 on n=2 folds — thin basis, stated); usage harm 0.05 (3×SE 0.032,
+rounded up); cost cap 25× paired-000 wall; rare-recovery NOT_SET (no metric —
+blocks adoption on that safeguard, P1-04 may close INCONCLUSIVE on it).
+Criterion 2′ (seed 31337, `development_criterion_v2.yaml`) was launched BEFORE
+this amendment text was written and runs independently of it; its outcome is
+recorded in the prereg file on completion, not in this entry.
+Trade-offs and negative evidence: the duplicate-bank control proved
+uninformative on matched cosines (Hungarian absorbs the copy; the penalty
+lives in the score denominator) — recorded, not hidden. Thresholds rest on
+one DEVELOPMENT dataset realisation; a second realisation could shift the
+band, which is why both values sit mid-band rather than at an edge.
+Consequences: P0-06 DONE (code existed at P0-06, constant now in the frozen
+file). `select_rank` production use remains gated on P1-02's caller.
+Protocol/data versions superseded: v1.0.1 → v1.1. No rows exist under v1.1 yet.
+Independent confirmation needed: no (development-tier calibration).
+
 ## Entry template
 
 ### D<id> — <title>

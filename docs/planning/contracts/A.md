@@ -1,7 +1,7 @@
 # Feature contract — A (donor-blocked predictive rank selection)
 
-Status: DRAFT — hypothesis restated, endpoints and margins still NOT_SET
-Protocol version/hash: v1.0.1, `715639895663bc74e7b864bc1cfae60c2fcd05b013e25f23016d45e86f4f9ca5`
+Status: FROZEN at P1-01 (v1.1 amendment) — hypothesis, endpoints, margins and pairing fixed below; changing any of them after seeing an A-ON row creates a new protocol version
+Protocol version/hash: v1.1, `cc5241076a6c3e5f98b7575f0b09b12337c119e6ddaea685514692ebc9d42ec9`
 Code/environment revision: harness `e277e5a`, upstream `5dbc5baaa0b9079b55bce554d801caa235a50457` (`src/cnmf/**` unmodified)
 Evidence tier: NONE for adoption. DEVELOPMENT evidence exists and informs design only.
 
@@ -81,14 +81,15 @@ estimates a harder quantity honestly.
 
 | Role | Metric and exact definition | Direction | Decision margin | Evidence used to set margin |
 |---|---|---|---|---|
-| Primary | `heldout_squared_prediction_error_v1`, equal-donor mean | Lower | **NOT_SET** | — |
-| Safeguard: program recovery | `program_recovery_cosine_v1`, reported beside its matched null | Higher | **NOT_SET** | — |
-| Safeguard: rare/context-specific recovery | NOT_SET — no rare-program metric exists yet | Higher | **NOT_SET** | — |
-| Safeguard: prediction | `usage_error_v1` | Lower | **NOT_SET** | — |
-| Safeguard: cost/failures | `wall_seconds_v1`, `failed_fits_v1` | Lower | **NOT_SET** | A adds inner-fold fits, so its cost is expected to rise; the margin bounds how much |
+| Primary | `heldout_squared_prediction_error_v1`, equal-donor mean | Lower | **30** (training-scale units) | 3× donor-level SE (10.45, n=48 donor-rows) at K_true=7 in DEVELOPMENT 000 controls (`p04-dev-000m`, both folds); mean 422, so the margin is ~7% — a gain smaller than this is indistinguishable from donor noise |
+| Safeguard: program recovery | `program_recovery_cosine_v1`, reported beside its matched null | Higher | **max harm 0.01** | ~12× the experiment-level SE (0.0008) at K_true in the same controls — but n=2 folds makes that SE a thin basis, stated here; 0.01 is small against the 0.15 fit–null gap (0.983 vs 0.83) |
+| Safeguard: rare/context-specific recovery | NOT_SET — no rare-program metric exists yet | Higher | **NOT_SET** | — (blocks adoption on this safeguard until defined; P1-04 may close INCONCLUSIVE on it rather than force a metric into existence under deadline) |
+| Safeguard: prediction | `usage_error_v1` | Lower | **max harm 0.05** | 3× experiment-level SE (0.0106 → 0.032) at K_true in the same controls, rounded up; mean 0.41 |
+| Safeguard: cost/failures | `wall_seconds_v1`, `failed_fits_v1` | Lower | **25× the paired 000 total wall** | Relative cap (hardware-independent): the inner loop adds ~28 fits (≈10–20× the outer fit), so 25× bounds A's price with headroom; failures counted, never averaged away |
 
-**No scientific adoption decision may be issued while any field above reads NOT_SET.** The
-margins are set at the start of P1 on development controls, which creates protocol v1.1.
+**No scientific adoption decision may be issued while the rare-recovery row reads NOT_SET**, except an INCONCLUSIVE close that states exactly this. All other margins above are frozen with the v1.1 amendment on development controls, before any A-ON row exists.
+
+**Margins frozen at P1-01 above**, on development controls, before any A-ON row exists. The rare-recovery exception is stated in the table, not waived here.
 
 ## Known obstacle, recorded before P1 rather than discovered during it
 

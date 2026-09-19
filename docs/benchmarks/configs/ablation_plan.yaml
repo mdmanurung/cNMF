@@ -9,9 +9,9 @@ protocol:
   # Any edit to that file invalidates this hash and creates a new protocol version
   # (PROTOCOL.md section 9) — update this value in the same commit as the edit.
   state: frozen
-  version: 1.0.1
+  version: 1.1
   path: docs/planning/PROTOCOL.md
-  sha256: 715639895663bc74e7b864bc1cfae60c2fcd05b013e25f23016d45e86f4f9ca5
+  sha256: cc5241076a6c3e5f98b7575f0b09b12337c119e6ddaea685514692ebc9d42ec9
   # Confirmation stays locked: PROTOCOL.md leaves `delta` (the baseline selector's
   # stability tolerance) and the precision/recall threshold null by design, both are
   # set on development controls at the start of P1, and no margin below is set yet.

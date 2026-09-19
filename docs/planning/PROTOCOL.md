@@ -1,6 +1,6 @@
 # PROTOCOL — frozen benchmark and selection rules
 
-`protocol_version: 1.0.1`
+`protocol_version: 1.1`
 `hash_convention_version: 1`
 `metric_definition_version: 1`
 State: **FROZEN** (see §9 for what "frozen" permits and forbids)
@@ -122,19 +122,27 @@ tuned using true simulated rank or any outer-test result.
 
 ---
 
-## 2. `delta` is null, and the selector refuses to run without it
+## 2. `delta`, calibrated at P1-01 on development controls
 
-`delta: null`
+`delta: 0.04812`
 
-`delta` is a **frozen protocol constant, not a tuned parameter**. It has not been set, because
-setting it honestly requires development controls that do not exist yet — the simulator is built
-after this file is frozen.
+Set once at P1-01 (v1.1 amendment, D026/D033) by the procedure frozen below,
+before any outer-test run and before any A-ON row exists. It is a **frozen
+protocol constant, not a tuned parameter** and may not be adjusted afterwards
+without a new protocol version.
 
-**Enforcement.** While `delta` is null the baseline selector **refuses to run** and raises rather
-than falling back to a default. This mirrors `null_margin_policy:
-refuse_scientific_adoption_decision` in `ablation_plan.yaml`: a missing pre-registered constant
-stops the analysis instead of being quietly filled in. A default value chosen at the point of use
-would be a value chosen after seeing the data.
+**Calibration record.** Four optimizer seeds on `base_identifiable` and `A_weak`
+at DEVELOPMENT tier; `delta` is the maximum per-(outer fold, K) silhouette
+standard deviation observed (`base_identifiable outer_0, k=8`). Full curves and
+dispersion table in D026; runs under `results/exploratory/p06-delta-*`
+(calibration inputs, never benchmark rows). Step 4 (record before checking
+selection) and step 5 (no adjustment on true rank or outer-test results) were
+observed: the value was written down before `select_rank` was run on any curve.
+
+**Enforcement history.** While `delta` was null (v1.0.1) the baseline selector
+refused to run rather than fall back to a default. That refusal is spent: with
+`delta` set, the selector operates. A value chosen at the point of use would
+still be a value chosen after seeing the data, and remains forbidden.
 
 **Order of checks — normative, because §1.4 would otherwise conflict with this section.** The
 null-`delta` refusal is evaluated **first**, before the eligible grid is built and before any
@@ -279,6 +287,16 @@ used a fixed amplitude, would not be a fair floor.
 
 The evaluated gene universe, the loss weights and the null predictor are frozen within a fold.
 
+**Scope across arms (D016, v1.1).** The training-scale loss is primary wherever
+the compared arms share `s_g` — within one arm across ranks (feature A), and
+across C arms (identical factor banks, identical cells). Where the arms cannot
+share `s_g` — feature B, whose sampling rule changes which cells reach
+`cnmf.prepare` and hence the scale itself (measured drift median 1.04, max
+1.24) — the **count-unit back-transform is the primary endpoint** and the
+training-scale number is reported beside it, never compared across arms. This
+resolves the `ablation_plan.yaml:63` vs `contracts/B.md` conflict on the side
+of the units the arms share; `contracts/B.md` needs no change.
+
 ### 3.5 `equal_donor_mean`
 
 The primary aggregation (`ablation_plan.yaml: primary_aggregation`).
@@ -340,6 +358,20 @@ inherit that crash and lose the rest of the fold.
 
 Panel sizes and dictionary identifiability on the inference panel are recorded per fold.
 
+### 4.4 Nested donor folds and inner-fold identity
+
+Feature A selects rank on **inner** donor folds nested inside each outer
+training fold (P0-05): inner-training donors fit candidate dictionaries, inner-
+validation donors score them via the §3.3/§3.4 machinery with a panel drawn over
+the inner `G`. The inner fit selects its own `G` and `s_g` from inner-training
+cells only — reusing the outer fold's would leak inner-validation donors into
+rank selection one level down. Inner-fold rows carry an `inner_split_id` in
+their `experiment_id` (following the `variant` precedent, D025); two inner
+folds of one outer fold at one rank must never collide on identity. The inner
+loop runs only when feature A is on; the A-OFF baseline never reads an inner
+validation fold (its selector inputs pre-exist on disk after the rank sweep,
+§1.1).
+
 ---
 
 ## 5. Metric vocabulary
@@ -360,13 +392,38 @@ The `independent_unit_type` for primary endpoints is `donor`, per §3.5.
 | `heldout_squared_prediction_error_counts_v1` | lower | §3.4 count-unit back-transform |
 | `null_squared_prediction_error_v1` | lower | §3.4 null predictor, inference-panel amplitude only |
 | `program_recovery_cosine_v1` | higher | `Σ(matched cosine) / max(K_true, K_inferred)`; one-to-one maximum-weight matching on **full loading vectors in common gene units** via `scipy.optimize.linear_sum_assignment`, with dummy factors absorbing unmatched components. Record matched, missing, extra and ambiguous counts. |
-| `program_precision_v1` | higher | Threshold **null until calibrated** on development controls (§2). Refuses to run while null. |
-| `program_recall_v1` | higher | As above, same threshold, same refusal. |
+| `program_precision_v1` | higher | Threshold **0.90**, calibrated at P1-01 (see below). A true program counts as recovered when its matched cosine clears the threshold; precision divides by `K_fitted`. |
+| `program_recall_v1` | higher | Same threshold **0.90**; recall divides by `K_true`. |
+| `ambiguous` | — | Count of true programs whose top-2 cosine gap falls below **0.20**, calibrated at P1-01 (see below). A diagnostic safeguard, not a primary endpoint. |
 | `usage_error_v1` | lower | **Reuses the alignment computed from loadings** for `program_recovery_cosine_v1`. Re-deriving an alignment from usages would flatter the method. Missing and extra components are retained as error terms in a union representation, not dropped. |
 | `wall_seconds_v1` | lower | Elapsed wall time of the scored unit of work |
 | `cpu_seconds_v1` | lower | CPU time; `memory_scope` in `EXPERIMENTS.tsv` records what was measured |
 | `peak_memory_mb_v1` | lower | Peak RSS; scope as above |
 | `failed_fits_v1` | lower | Count of fits that did not complete; always emitted, including as 0 |
+
+**Threshold calibration, P1-01 (D033).** Both constants were set on DEVELOPMENT
+controls only (`p04-dev-000m`, configuration 000, both outer folds at
+`K_true = 7`), before any A-ON row exists; full distributions in
+`registry/p1-01_threshold_calibration.tsv`. Recovery threshold **0.90**: the
+observed separation band between the matched null (max 0.833 over both folds)
+and genuinely recovered programs (min 0.974) is [0.84, 0.97], and 0.90 is its
+midpoint; below it sit the null (≤0.833), the noise-replaced control
+(0.72–0.75) and the deleted-program dummy (0.0). Ambiguous threshold **0.20**:
+top-2 gaps at `K_true` are all ≥0.354 in both folds, while off-rank fits show
+gaps down to 0.0003; 0.20 flags the latter with zero false alarms at `K_true`.
+Neither value was adjusted on any outer-test result or to favour a later
+comparison; both are frozen with this version.
+
+### 5.4 Controlled vocabularies (D009, solemnised here)
+
+The row schemas' controlled strings, enforced in `cnmfbench/records.py` since
+the skeleton session and frozen here as part of the single v1.1 amendment
+rather than a second versioning: `status ∈ {ok, ok_provisional, fit_failed,
+scoring_failed}` (blank = true null, `NOT_COMPUTED` = could not be produced);
+`evaluation_scope` names the unit the row aggregates over and is a required
+filter on any aggregation; `arm ∈ {full_training_pool, matched_budget,
+upstream_full_data, genenmf_native}`. No rule changes — this section writes
+down what the writer already enforces.
 
 Cost metrics are reported for every configuration, always, so that a gain is never assessed
 without its price (`cost_cap` lives in the feature contracts).
@@ -456,6 +513,15 @@ cells per donor, genes, true programs, observation model and its parameters), th
 `simulation_replicate`, and this protocol's version. Two datasets with the same manifest hash must
 be bitwise identical; two that differ in any of the above must not collide.
 
+### 6.7 Feasibility pre-registrations carry an instrument-failure branch (D012)
+
+Every feasibility pre-registration written under this protocol must include,
+alongside benchmark-failure responses, the branch the v1 menu lacked: "the
+criterion was mis-specified — record the verdict unchanged, argue the defect
+from the run's own data, pre-register a replacement, and test it on a fresh
+seed it did not motivate." A criterion rewritten by whoever just watched it
+fail carries no evidential weight; a re-scored old run is not a result.
+
 ---
 
 ## 7. Hash convention
@@ -496,9 +562,9 @@ Deliberately absent, so their absence is not read as an oversight:
 
 **Frozen:** every rule in §§1, 3, 4, 5, 6, 7. These may not be changed to accommodate a result.
 
-**Not yet set, by design:** `delta` (§2) and the precision/recall threshold (§5.2). Both are null,
-both refuse to run while null, and both have their calibration procedure frozen above. Setting
-either is a versioned amendment, not an edit.
+**Not yet set, by design:** none at the protocol level — v1.1 sets `delta`
+(§2) and both §5.2 thresholds. Numerical decision margins live in
+`contracts/{A,B,C}.md`, not here (§8).
 
 **Amendment rules:**
 
