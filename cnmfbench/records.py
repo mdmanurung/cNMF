@@ -100,7 +100,7 @@ ARM = ("full_training_pool", "matched_budget", "upstream_full_data", "genenmf_na
 
 
 def make_experiment_id(configuration, arm, dataset_id, outer_split_id, candidate_rank, seeds,
-                       variant=None):
+                       variant=None, inner_split_id=None):
     """Readable and deterministic. Same inputs ⇒ same id ⇒ a re-run is detectable.
 
     The trailing 12 hex characters disambiguate runs that differ only in seeds. §7's
@@ -120,6 +120,15 @@ def make_experiment_id(configuration, arm, dataset_id, outer_split_id, candidate
     written before it existed stays valid and no evidence needs regenerating. `dataset_id`
     would have been the wrong place — the dataset is the same — and `arm` is a frozen protocol
     vocabulary, not a scratchpad for diagnostics.
+
+    **`inner_split_id` exists for the same reason, pre-emptively (D020 sub-problem 8).**
+    `_run_inner_fold` fits and scores per `(outer_split_id, inner_split_id, candidate_rank)`,
+    but none of those three vary across two inner folds of the same outer fold at the same
+    rank without it — two such inner folds would collide on `experiment_id` today, exactly
+    the way the `variant` docstring above describes for a different axis. Not yet exercised
+    by any caller (feature A cannot run while `delta` is null, §2), so this only prevents the
+    collision from being discovered by a production run instead of by design. Folded into the
+    digest **only when set**, so every id written before it existed stays valid.
     """
     payload = {
         "configuration": configuration, "arm": arm, "dataset_id": dataset_id,
@@ -130,9 +139,12 @@ def make_experiment_id(configuration, arm, dataset_id, outer_split_id, candidate
     }
     if variant:
         payload["variant"] = str(variant)
+    if inner_split_id:
+        payload["inner_split_id"] = str(inner_split_id)
     digest = parameter_hash(payload)
     rank = "fit" if candidate_rank is None else f"k{int(candidate_rank)}"
     label = f"{dataset_id}-{variant}" if variant else dataset_id
+    label = f"{label}-{inner_split_id}" if inner_split_id else label
     return f"{configuration}-{arm}-{label}-{outer_split_id}-{rank}-{digest[:12]}"
 
 

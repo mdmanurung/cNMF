@@ -1,0 +1,63 @@
+# P0-06 delta calibration: base_identifiable, optimizer-seed dispersion. Derived from
+# development_000m.yaml; only `seed` differs (panel_seed/sampling_seed fixed so this
+# isolates optimizer-seed noise, per PROTOCOL.md §2 step 3, from the panel-repetition
+# variance already measured separately at D022).
+# DEVELOPMENT tier, configuration 000. Derived from development.yaml;
+# only `features` and `discovery` differ. All four cells share arm matched_budget
+# (cell_budget 1440) so the A-OFF factorial is a factorial.
+#
+# Run because SMOKE was shown INCAPABLE of exercising feature C: its factor bank is
+# only n_iter*k = 10-20 spectra and C dropped a contribution in 1 of 12 cases. Here
+# n_iter=10 and k up to 10, so the bank is 40-100 -- the range where C measurably
+# fired on the real Kang data (1-9 dropped at bank 60-140).
+schema_version: 1
+profile: development
+evidence_tier: DEVELOPMENT
+allow_scientific_promotion: false
+seed: 90211
+scenario: base_identifiable
+simulation:
+  donors: 24
+  cells_per_donor: 200
+  genes: 2000
+  true_programs: 7
+  observation_model: poisson
+  independent_replicates: 1
+factorization:
+  backend: pinned_upstream_cnmf
+  loss: frobenius
+  candidate_ranks:
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  optimizer_starts: 10
+  max_optimizer_iterations: 300
+  num_highvar_genes: 1200
+  density_threshold: 2.0
+validation:
+  outer_donor_folds: 2
+  inner_donor_folds: 2
+  inference_gene_fraction: 0.5
+  panel_seed: 20260918
+  panel_repetitions: 5
+  projection: nonnegative_least_squares_frozen_dictionary
+  transform: training_fitted_and_leakage_audited
+resources:
+  cores: 2
+  blas_threads_per_job: 1
+  memory_limit_mb: 8192
+features:
+  A: false
+  B: false
+  C: false
+source_pins:
+  cnmf_full_commit_sha: 5dbc5baaa0b9079b55bce554d801caa235a50457
+  genenmf_full_commit_sha: null
+discovery:
+  arm: matched_budget
+  cell_budget: 1440
+  sampling_seed: 424242

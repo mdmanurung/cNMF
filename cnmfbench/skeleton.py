@@ -708,10 +708,20 @@ def _run_fold(fold, adata, raw, donors, gene_names, ranks, cfg, params, ds,
     x_train_scaled = to_training_scale(raw[np.ix_(fit_pos, g_pos)], s_g)
     null_v = null_dictionary(x_train_scaled)  # scaled, not raw — a 4x error if confused
 
+    # `_fold_diagnostics` runs one `consensus()` per candidate rank (the silhouette sweep
+    # that the P0-06 selector reads). Until this timing was added, that sweep sat between
+    # the fit-timing window (closed above, at `fit_wall`/`fit_cpu`) and the per-rank window
+    # (opened below, at `t1`/`c1`) and landed on no `RESULTS.tsv` row — so the A-OFF
+    # baseline's entire selector input cost nothing, while A-ON's inner-fold fits will be
+    # timed. Folded into the shared fit-scope cost below, alongside the fit itself, because
+    # like the fit it serves every candidate rank and has no single rank to attribute to.
+    diag_t0, diag_c0 = time.perf_counter(), time.process_time()
     diagnostics = [_fold_diagnostics(fold, ds, g_list, g_pos, panel, s_g, obj, ranks,
                                      density_threshold, transform_rel_error, n_excluded,
                                      norm, x_test, inf_pos, val_pos, test_rows[keep])]
     diagnostics[0]["panel_variance_by_k"] = {}
+    fit_wall += time.perf_counter() - diag_t0
+    fit_cpu += time.process_time() - diag_c0
     results, experiments = [], []
 
     # ---- fit-scope rows: the shared prepare/factorize/combine cost, attributed once ----
@@ -919,12 +929,17 @@ def _fold_diagnostics(fold, ds, g_list, g_pos, panel, s_g, obj, ranks, density_t
     val_full = g_pos[val_pos]
     error_floor = poisson_error_floor(ds.expected_counts, s_g_full, scored_cell_rows, val_full)
 
-    sil = {}
+    sil, pred_err = {}, {}
     for k in ranks:
         stats = obj.consensus(k=k, density_threshold=density_threshold,
                               show_clustering=False,
                               skip_density_and_return_after_stats=True)
-        sil[k] = float(np.asarray(stats).ravel()[2])  # k, local_density_threshold, silhouette, error
+        row = np.asarray(stats).ravel()  # k, local_density_threshold, silhouette, error
+        sil[k] = float(row[2])
+        # PROTOCOL.md §1.1: prediction_error "is recorded but is not used by the primary
+        # rule" — recorded here as a diagnostic, never a RESULTS.tsv metric (see the
+        # docstring above), and never substituted for silhouette in the P0-06 selector.
+        pred_err[k] = float(row[3])
     sil_range = max(sil.values()) - min(sil.values())
 
     # §1.5 permits reading true structure as an explicitly labelled diagnostic, never as
@@ -945,6 +960,7 @@ def _fold_diagnostics(fold, ds, g_list, g_pos, panel, s_g, obj, ranks, density_t
         "transform_rel_frobenius_vs_cnmf": transform_rel_error,
         "s_g_min": float(s_g.min()), "s_g_max": float(s_g.max()),
         "silhouette_by_k": sil,
+        "prediction_error_by_k": pred_err,
         "silhouette_dynamic_range": sil_range,
         "degenerate_branch_would_fire": bool(sil_range < 1e-6),
         "hvg_retention_per_program": hvg_retention(ds, g_pos),

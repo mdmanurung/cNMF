@@ -1,0 +1,45 @@
+# P0-06 step 5: confirm A_weak executes at SMOKE before spending DEVELOPMENT time on it
+# (scenarios.py:136-146 implements it; it had never been run at any tier). Not a tracked
+# factorial cell -- do not merge into RESULTS.tsv/EXPERIMENTS.tsv. Identical to smoke.yaml
+# except `scenario`; A_weak only overrides lambda_separation/p_active, neither of which
+# check_preconditions' simulation.* divergence check reads, so this block is unchanged.
+schema_version: 1
+profile: smoke
+evidence_tier: SMOKE
+allow_scientific_promotion: false
+seed: 1701
+scenario: A_weak
+simulation:
+  donors: 8
+  cells_per_donor: 30
+  genes: 180
+  true_programs: 3
+  observation_model: poisson
+  independent_replicates: 1
+factorization:
+  backend: pinned_upstream_cnmf
+  loss: frobenius
+  candidate_ranks: [2, 3, 4]
+  optimizer_starts: 5
+  max_optimizer_iterations: 300
+  num_highvar_genes: 100
+  density_threshold: 2.0
+validation:
+  outer_donor_folds: 2
+  inner_donor_folds: 2
+  inference_gene_fraction: 0.5
+  panel_seed: 20260917
+  panel_repetitions: 1
+  projection: nonnegative_least_squares_frozen_dictionary
+  transform: training_fitted_and_leakage_audited
+resources:
+  cores: 2
+  blas_threads_per_job: 1
+  memory_limit_mb: 4096
+features:
+  A: false
+  B: false
+  C: false
+source_pins:
+  cnmf_full_commit_sha: 5dbc5baaa0b9079b55bce554d801caa235a50457
+  genenmf_full_commit_sha: null
