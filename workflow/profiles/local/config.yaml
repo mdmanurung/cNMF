@@ -1,0 +1,12 @@
+# P0-07 local profile. Single-machine execution; BLAS threading capped so
+# cpu_seconds_v1 measures the workload, not thread oversubscription.
+cores: 2
+jobs: 2
+resources:
+  mem_mb: 4096
+  blas_threads_per_job: 1
+set-threads: 1
+envvars:
+  - OMP_NUM_THREADS=1
+  - OPENBLAS_NUM_THREADS=1
+  - MKL_NUM_THREADS=1

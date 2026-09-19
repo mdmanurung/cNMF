@@ -1,0 +1,14 @@
+# P0-07 SLURM profile. Declared resources per job; the harness caps BLAS
+# threads itself via check_preconditions (all three thread vars must be 1).
+# Status: NOT_RUN_ON_SLURM — sbatch exists on this host but no benchmark job
+# has been submitted through this profile yet (P0-07 records, not claims).
+executor: slurm
+jobs: 4
+default-resources:
+  - mem_mb=4096
+  - runtime_min=60
+  - cpus_per_task=2
+envvars:
+  - OMP_NUM_THREADS=1
+  - OPENBLAS_NUM_THREADS=1
+  - MKL_NUM_THREADS=1

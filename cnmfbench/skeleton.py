@@ -47,7 +47,7 @@ from . import UPSTREAM_CNMF_SHA
 from .contract import ContractViolation
 from .hashing import cell_set_hash, artifact_hash
 from .io import write_dataset
-from .provisional import provisional, touched
+from .provisional import touched
 from .records import (
     ARM, EXPERIMENTS_COLUMNS, NOT_COMPUTED, RESULTS_COLUMNS, contract_hash,
     environment_hash, experiment_row, implementation_sha, make_experiment_id,
@@ -275,7 +275,6 @@ def verify_transform_matches_cnmf(raw_train_on_g, norm_counts_x, s_g, tol=1e-5):
     return rel
 
 
-@provisional("skeleton.run")
 def run(config_path, out_root, run_id=None, dry_run=False):
     """One end-to-end SMOKE run. Returns a summary dict; writes shards, not tracked TSVs."""
     root = _repo_root()

@@ -1,0 +1,23 @@
+# P0-07 smoke workflow. Orchestration only: every scientific rule lives in
+# cnmfbench/ and the frozen PROTOCOL.md, never here.
+#
+# Canonical invocations (paths carry the docs/ prefix per DECISIONS.md D001):
+#   snakemake --snakefile workflow/Snakefile --profile workflow/profiles/local \
+#     --configfile docs/benchmarks/configs/smoke.yaml smoke
+#
+# Snakemake is the orchestrator; workflow/scripts/run_smoke.py holds the
+# executable logic so the smoke step is runnable without a Snakemake binary.
+
+configfile: "docs/benchmarks/configs/smoke.yaml"
+
+rule smoke:
+    output:
+        sentinel="results/scratch/smoke/SUCCESS.json",
+    shell:
+        "python workflow/scripts/run_smoke.py "
+        "--config docs/benchmarks/configs/smoke_000m.yaml "
+        "--out-root results/scratch --run-id smoke"
+
+rule clean_smoke:
+    shell:
+        "rm -rf results/scratch/smoke"

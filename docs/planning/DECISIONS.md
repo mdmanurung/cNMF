@@ -451,6 +451,47 @@ Consequences for the baseline and active feature set: none until P1-01 amends PR
 Protocol/data versions superseded: none — this entry does not change `PROTOCOL.md`.
 Independent confirmation needed: no (this is development-tier calibration evidence, not a confirmation-tier result).
 
+## D027 — P0-07 un-fences `skeleton.run`: cache, restart, smoke workflow, SLURM status
+
+Date/time: 2026-09-19, P0-07 session
+Type: implementation
+Related task, feature, gate: P0-07, gate P0
+Context: `provisional.py` fenced `skeleton.run` as a "linear in-process driver" with
+"no cache, no restart, no CI, no SLURM", requiring "the P0-07 workflow with restart
+and cache-invalidation tests" before un-fencing. P0-07 built exactly that:
+`cnmfbench/cache.py` (content-keyed `cache_key`, atomic `SUCCESS.json` sentinel via
+tmp + `os.replace`, `needs_recompute` covering changed inputs, changed options,
+changed code and interrupted outputs), `cnmfbench/tests/test_cache.py` (6 tests),
+`workflow/Snakefile` (`smoke`, `clean_smoke`), `workflow/scripts/run_smoke.py`
+(runnable without a Snakemake binary, which is not installed on this host),
+`workflow/profiles/local/config.yaml` and `workflow/profiles/slurm/config.yaml`.
+Options considered: (a) keep the fence while adding more orchestration (CI workflow,
+full Snakemake rule set for all 11 pipeline stages); (b) un-fence now on the
+evidence that the named hardening requirement is met.
+Decision: **(b).** The `@provisional("skeleton.run")` decorator and its registry
+entry are deleted together, in this commit with this entry — per the fence's own
+rule that closing means deleting both, not forgetting to look.
+Evidence paths and experiment IDs: `python -m pytest cnmfbench/tests/test_cache.py -q`
+→ 6 passed; `python -m pytest cnmfbench -q` → 247 passed;
+`python workflow/scripts/run_smoke.py --config docs/benchmarks/configs/smoke_000m.yaml --out-root results/scratch --run-id smoke`
+→ exit 0, 134 results / 8 experiments, `results/scratch/smoke/SUCCESS.json` written
+(gitignored scratch, not tracked evidence). `sbatch` exists on this host but no
+benchmark job has been submitted through the SLURM profile: status
+**NOT_RUN_ON_SLURM**, recorded in the profile itself.
+Trade-offs and negative evidence: no CI workflow (`.github/`) was added — there is
+no remote to run it against yet (branch is local-only, 51 ahead of origin/main) and
+adding CI YAML untested by any runner would be the kind of unverified syntax
+IMPLEMENTATION_PROMPT §11 forbids. The Snakefile covers smoke only, not the full
+11-stage rule set; extending it is future P0-07-adjacent work, not a gate blocker.
+The full test suite still reports `test_the_gate_is_blocked_while_components_are_provisional`
+passing because three fenced components remain (`splits.outer_donor_folds`,
+`features.consensus_c`, `features.discovery_sample_b`) — the P0 gate stays blocked,
+correctly.
+Consequences for the baseline and active feature set: fence four → three. No
+`src/cnmf/**` change. No tracked `RESULTS.tsv`/`EXPERIMENTS.tsv` change.
+Protocol/data versions superseded: none. PROTOCOL.md stays v1.0.1.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>

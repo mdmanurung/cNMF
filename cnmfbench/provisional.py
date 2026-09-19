@@ -64,12 +64,6 @@ PROVISIONAL = {
             "loop is exercised by a real run rather than by tests alone.",
         ),
         ProvisionalComponent(
-            component_id="skeleton.run",
-            owner_task="P0-07",
-            reason="Linear in-process driver. No cache, no restart, no CI, no SLURM.",
-            hardening_requires="The P0-07 workflow with restart and cache-invalidation tests.",
-        ),
-        ProvisionalComponent(
             component_id="features.consensus_c",
             owner_task="P3-01",
             reason="Feature C reimplements upstream's consensus aggregation harness-side, "
