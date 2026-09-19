@@ -737,6 +737,38 @@ inner loop. No `src/cnmf/**` change; no tracked-row change.
 Protocol/data versions superseded: none (v1.1 rules applied, not altered).
 Independent confirmation needed: no.
 
+## D035 — Criterion 2′ evaluated on a fresh seed: NO-GO again, on variance
+
+Date/time: 2026-09-19, P1-01 session
+Type: scientific adoption (feasibility, second instrument)
+Related task, feature, gate: P1-01, feature A
+Context: the v2 preregistration (fresh seed 31337, new panel) executed as
+attempt 2 after attempt 1 died with its parent shell (reported in the prereg
+file, no rows). 638 results / 16 experiments, exit 0, same dataset hash.
+Outcome: C1 PASS both folds (t=10.5, 16.5), C3 PASS (0.32, 0.25), C2′ PASS
+outer_1 (t=3.28) but FAIL outer_0 (t=2.15) → verdict NO-GO under the
+pre-registered rule. Donor table: 24/24 diffs positive (unanimous direction),
+three outer_0 donors (+334, +283, +182) inflate SE past the bar.
+Decision: **record NO-GO; do not override, do not re-replace.** The §6.7
+instrument-failure branch justified replacing v1 (which measured a span that
+is flat by construction); invoking it again on the replacement — whose span
+(K_min→K_true) is the descent itself — would be rewriting the instrument until
+it passes. What is recorded instead: the failure is variance under n=12/fold
+heterogeneity, not absence of signal (unanimous direction, K_true minima,
+C1 at t>10). P1 proceeds (A is measured regardless); P1-04 carries
+"benchmark may be unresolving" as the live alternative to a null A result.
+Evidence paths and experiment IDs: prereg file Results section (this verdict);
+`results/exploratory/p0-03-dev-criterion-v2/` (638/16, gitignored scratch);
+donor table computed from the run's per-donor rows (commands in session).
+Trade-offs and negative evidence: n=12 donors per fold is thin for a 3×SE bar
+under 100× magnitude spread — but the bar was committed, and thinness argued
+after the fact is the same act as choosing the bar after the fact.
+Consequences: P1-01 DONE (amendment + margins + criterion run all closed).
+P1-03's A_weak pair matters more now: it is the regime where selection should
+be harder-but-possible independent of this gate.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no (development-tier feasibility, not adoption).
+
 ## Entry template
 
 ### D<id> — <title>

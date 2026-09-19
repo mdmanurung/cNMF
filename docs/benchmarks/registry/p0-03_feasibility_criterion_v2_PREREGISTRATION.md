@@ -98,4 +98,34 @@ otherwise edited.
 
 ## Results
 
-_(none yet)_
+Attempt 1 (2026-09-19, killed by session timeout, no rows — see above) is not
+an evaluation. Attempt 2 below is the evaluation.
+
+Attempt 2 (2026-09-19, run `p0-03-dev-criterion-v2`, config
+`development_criterion_v2.yaml`: seed 31337, panel_seed 20260919): exit 0,
+638 results / 16 experiments, all `ok_provisional`. Same dataset as v1
+(manifest `31b4cf0b…` — same generative process, new split and panel, as
+committed). Evaluated in place; not merged into tracked TSVs.
+
+| fold | C1 (Kmax−Ktrue > 3×SE) | C2′ (Kmin−Ktrue > 3×SE) | C3 (sil range > 1e-6) |
+|---|---|---|---|
+| outer_0 | PASS (t=10.54) | **FAIL** (mean 74.49, 3×SE 104.17, t=2.15) | PASS (0.316) |
+| outer_1 | PASS (t=16.50) | PASS (mean 40.70, 3×SE 37.17, t=3.28) | PASS (0.251) |
+
+**Verdict: NO-GO** (rule: NO-GO if any fails). The v1 verdict stands unrevised
+and so does this one — recorded, not overridden.
+
+What the failure is made of (donor table read off the run's per-donor rows):
+every one of the 24 test donors has K_min worse than K_true (diffs +3.4 to
++333.6, unanimous direction), but three outer_0 donors carry most of the mass
+(+333.6, +283.1, +181.9) and inflate the SE past the 3× bar. This is variance,
+not absence: the loss curves minimise at K_true in both folds, silhouette
+ranges are 0.25–0.32, and criterion 1 passes at t>10 in both folds. The
+instrument (paired t with n=12 against heterogeneous donor magnitudes) is
+stricter than the signal's unanimity warrants — stated as an observation, not
+as a revision, and not as a third criterion: re-replacing the replacement
+would be exactly what §6.7 exists to prevent from happening quietly.
+
+What it licenses: P1 runs regardless (A is measured, not gated, by this);
+P1-04 must carry "benchmark may be unresolving at n=12/fold" as the live
+alternative to any null A result on `base_identifiable`.

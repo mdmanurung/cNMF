@@ -31,8 +31,8 @@
 ## 2. Progress counts
 
 **9 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05, P0-07, P0-02).  
-**14 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05, P0-07, P0-02, P0-08, P0-09, P0-10, P0-06, P1-02).  
-TODO: 14 · IN_PROGRESS: 2 (P1-01 — amendment committed; criterion-2′ run in flight; P1-03 — active after test green) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
+**15 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05, P0-07, P0-02, P0-08, P0-09, P0-10, P0-06, P1-02, P1-01).  
+TODO: 13 · IN_PROGRESS: 1 (P1-03 — DEVELOPMENT pairs queued) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
 
 Scientific adoption remains separate and untouched. P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance; S0-03 establishes the rules by which future evidence will be judged; the skeleton establishes that the loop executes end to end. **None of that is evidence for any feature.** Benchmark numbers now exist, but only at SMOKE tier, from fenced throwaway components, for the reference configuration `000` — there is nothing to compare them against, and `smoke_can_promote_feature: false` forbids using them if there were.
 
@@ -73,7 +73,7 @@ Update status and evidence after each meaningful code/test batch. A task is DONE
 | P0-08 | P0 | Register a public multi-donor dataset and verify metadata | P0-02 | DONE | Kang 2018 registered (GEO GSE96583 via scverse mirror, sha256 re-verified this session, 8 donors via `replicate`, stim/ctrl labels); AIDA/Heart reserves; Stephenson rejected. License caveat kept (D029) |
 | P0-09 | P0 | Implement optional pinned GeneNMF comparator and output checks | S0-02, P0-02, P0-04 | DONE | D030's block lifted via R4_51 (R 4.5.1): GeneNMF 0.9.6 @ `59942b2` (GPL-3, adapter-only) installed, native workflow traced (SOURCE_AUDIT §2.7), R smoke 24 models → 10 MPs, conversion tests green (D031). No comparator rows; gene-set metric deferred to P2-01 |
 | P0-10 | P0 | Run baseline/null controls and close P0 readiness gate | P0-01 through P0-09* | DONE | `gates/P0.md`: software PASS, adoption NOT_APPLICABLE; fence scoped by D032 (3 entries transfer to owning gates); metric report from 4430/136 tracked rows; no external blockers (P0-08 DONE, P0-09 DONE) |
-| P1-01 | P1 | Freeze A hypothesis, endpoints, margins and pairing | P0-10 | IN_PROGRESS | Started 2026-09-19: v1.1 amendment (7 batched items) + A margins + criterion-2′ run; closes P0-06 |
+| P1-01 | P1 | Freeze A hypothesis, endpoints, margins and pairing | P0-10 | DONE | v1.1 (7 items, D033) + A margins + criterion-2′ run on fresh seed 31337: C1/C3 pass, C2′ split (outer_0 FAIL t=2.15, outer_1 PASS t=3.28) → NO-GO recorded, not overridden (D035). Unanimous 24/24 direction; variance, not absence |
 | P1-02 | P1 | Implement inner-validation rank selector as independent A switch | P1-01 | DONE | D020(1–7) built; `read_delta` + A admission; both selectors emit paired selected-rank rows reusing fixed fits (D034). 11 tests; 275 pass. Fence kept: first real A-ON run (P1-03) un-fences |
 | P1-03 | P1 | Run A target/safeguard and regression comparisons | P1-02 | IN_PROGRESS | Started 2026-09-19: DEVELOPMENT 000ab960 vs 100ab960 (shared budget) + A_weak pair; first real A-ON run un-fences `splits.outer_donor_folds` |
 | P1-04 | P1 | Close A software and scientific adoption decisions | P1-03 | TODO | P1 gate: KEEP/CONDITIONAL/DROP/INCONCLUSIVE plus evidence tier — **not yet available** |
