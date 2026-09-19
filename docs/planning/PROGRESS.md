@@ -10,7 +10,7 @@
 | Field | Current value |
 |---|---|
 | Active prototype | P0 — loop closes at SMOKE and DEVELOPMENT; P0-04 metrics **wired into the runner**; features B and C switchable and exercised at both tiers; nested donor folds and the §3.2 leakage audit implemented and tested against real fits (P0-05); P0-06's selector is implemented and `delta` calibrated (D026), PROTOCOL still v1.0.1; **P0-07 DONE** (cache/restart + smoke workflow, fence four → three, D027) |
-| Active task | P0-10 (baseline/null controls + P0 readiness gate) |
+| Active task | P1-01 (v1.1 amendment + frozen A margins — the gate is written, the amendment is next) |
 | Next task | **P0-08** — register a public multi-donor dataset and verify metadata (dependency P0-02 now DONE; or record an explicit external blocker) |
 | P0-02 note | P0-02 is DONE (schemas + manifest example + unit tags, D028); its dependency slot for P0-08/P0-09 is satisfied. P0-05/P0-06 proceeded around it by recorded deviation (D018/D021/D026); that history stands and is not rewritten. |
 | P0-06 note | **P0-06 stays IN_PROGRESS** — its row requires `delta` set *in the frozen protocol*, and the amendment that sets it is described (`PROTOCOL.md` §2, `PROGRESS.md:437`, `skeleton.py:192-197`) as a P1-01 event, but the task ledger's own dependency graph has **P1-01 depending on P0-10** (the P0 gate), not on P0-06 — a tension this entry names rather than resolves (do not "fix" it by editing either dependency; that is a call for whoever closes the P0 gate). P0-07 is now DONE; reaching the amendment and feature A still requires P0-02 and P0-08 through P0-10 to close the P0 gate first, unless a future session decides P1-01 can run earlier and records that decision |
@@ -31,8 +31,8 @@
 ## 2. Progress counts
 
 **9 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05, P0-07, P0-02).  
-**11 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05, P0-07, P0-02, P0-08, P0-09).  
-TODO: 17 · IN_PROGRESS: 2 (P0-06 — blocked on v1.1 amendment; P0-10 — active) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
+**12 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05, P0-07, P0-02, P0-08, P0-09, P0-10).  
+TODO: 16 · IN_PROGRESS: 2 (P0-06 — closes with the v1.1 amendment; P1-01 — active) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0
 
 Scientific adoption remains separate and untouched. P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance; S0-03 establishes the rules by which future evidence will be judged; the skeleton establishes that the loop executes end to end. **None of that is evidence for any feature.** Benchmark numbers now exist, but only at SMOKE tier, from fenced throwaway components, for the reference configuration `000` — there is nothing to compare them against, and `smoke_can_promote_feature: false` forbids using them if there were.
 
@@ -72,8 +72,8 @@ Update status and evidence after each meaningful code/test batch. A task is DONE
 | P0-07 | P0 | Implement smoke workflow, CI, cache/restart and local/SLURM profiles | P0-05 | DONE | `cnmfbench/cache.py` (content key, atomic `SUCCESS.json`, 4-axis invalidation) + `tests/test_cache.py` (6 tests); `workflow/Snakefile` + `scripts/run_smoke.py` (exit 0, 134 results / 8 experiments, scratch only); `profiles/local` + `profiles/slurm` (SLURM: NOT_RUN_ON_SLURM). `skeleton.run` un-fenced (D027); fence four → three; 247 harness tests pass |
 | P0-08 | P0 | Register a public multi-donor dataset and verify metadata | P0-02 | DONE | Kang 2018 registered (GEO GSE96583 via scverse mirror, sha256 re-verified this session, 8 donors via `replicate`, stim/ctrl labels); AIDA/Heart reserves; Stephenson rejected. License caveat kept (D029) |
 | P0-09 | P0 | Implement optional pinned GeneNMF comparator and output checks | S0-02, P0-02, P0-04 | DONE | D030's block lifted via R4_51 (R 4.5.1): GeneNMF 0.9.6 @ `59942b2` (GPL-3, adapter-only) installed, native workflow traced (SOURCE_AUDIT §2.7), R smoke 24 models → 10 MPs, conversion tests green (D031). No comparator rows; gene-set metric deferred to P2-01 |
-| P0-10 | P0 | Run baseline/null controls and close P0 readiness gate | P0-01 through P0-09* | IN_PROGRESS | Started 2026-09-19: metric report from tracked evidence (4430/136 rows, matched nulls); gate scoped by D032; `gates/P0.md` in progress |
-| P1-01 | P1 | Freeze A hypothesis, endpoints, margins and pairing | P0-10 | TODO | contracts/A.md with justified numerical decision rules — **not yet available** |
+| P0-10 | P0 | Run baseline/null controls and close P0 readiness gate | P0-01 through P0-09* | DONE | `gates/P0.md`: software PASS, adoption NOT_APPLICABLE; fence scoped by D032 (3 entries transfer to owning gates); metric report from 4430/136 tracked rows; no external blockers (P0-08 DONE, P0-09 DONE) |
+| P1-01 | P1 | Freeze A hypothesis, endpoints, margins and pairing | P0-10 | IN_PROGRESS | Started 2026-09-19: v1.1 amendment (7 batched items) + A margins + criterion-2′ run; closes P0-06 |
 | P1-02 | P1 | Implement inner-validation rank selector as independent A switch | P1-01 | TODO | Selection tests; no outer-data access; unchanged candidate fits — **not yet available** |
 | P1-03 | P1 | Run A target/safeguard and regression comparisons | P1-02 | TODO | 000 vs 100; weak/null regimes; prediction/recovery/cost evidence — **not yet available** |
 | P1-04 | P1 | Close A software and scientific adoption decisions | P1-03 | TODO | P1 gate: KEEP/CONDITIONAL/DROP/INCONCLUSIVE plus evidence tier — **not yet available** |

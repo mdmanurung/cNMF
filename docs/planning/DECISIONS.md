@@ -620,6 +620,36 @@ Consequences: P0-09 DONE; `genenmf_full_commit_sha` remains null in configs
 Protocol/data versions superseded: none.
 Independent confirmation needed: no.
 
+## D032 — P0 gate scoped to P0-owned hardening; three fence entries transfer out
+
+Date/time: 2026-09-19, P0-10 session
+Type: protocol (gate scoping)
+Related task, feature, gate: P0-10, gate P0, P1-01, P2-01, P3-01
+Context: `registry_is_empty()` is false with three entries left, owned by
+P0-06, P2-01 and P3-01 — so a literal "fence empty" gate makes P0 depend on
+P2/P3 (flagged in the warm-tome plan §8, "named, not solved"). Meanwhile
+`outer_donor_folds`' own un-fencing condition (D021: `delta` set *and* feature
+A runnable) is satisfiable only by the v1.1 amendment, which is P1-01 business.
+Options considered: (a) hold the P0 gate open until P3; (b) scope the P0 gate
+to P0-owned hardening and transfer each remaining entry to its owning gate.
+Decision: **(b).** P0-owned hardening is complete (`skeleton.run` un-fenced at
+D027 with cache/restart/workflow evidence; metrics, leakage, schemas, smoke,
+GeneNMF smoke all DONE). `outer_donor_folds` transfers to P1-01;
+`discovery_sample_b` to P2-01; `consensus_c` to P3-01. Rows they produced stay
+`ok_provisional` permanently (the fence's data-level rule), and the gate cites
+them as execution evidence only — `cited_rows_are_not_provisional` is scoped to
+adopted comparisons, of which P0 has none.
+Evidence paths and experiment IDs: `docs/planning/gates/P0.md` (this gate);
+4430/136 tracked rows measured this session; `provisional.py` (3 entries).
+Trade-offs and negative evidence: a scoped gate is weaker than an empty fence —
+stated here rather than hidden. The residual risk (thin components feeding P1)
+is bounded: B/C switches are OFF in every P1 comparison, and the inner loop's
+only production caller arrives with A itself.
+Consequences: P0-10 DONE; P0 closed. P0-06 stays IN_PROGRESS until the v1.1
+amendment (unchanged).
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>
