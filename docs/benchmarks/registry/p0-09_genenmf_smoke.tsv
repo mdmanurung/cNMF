@@ -1,0 +1,23 @@
+## P0-09 GeneNMF R smoke result, 2026-09-19. Native workflow only (multiNMF -> getMetaPrograms); execution check, promotes nothing.
+##
+## Pinned source: carmonalab/GeneNMF @ 59942b27c2cc2dbf55264b80b4ff26e3188cdf41 (v0.9.6, GPL-3), installed in conda env R4_51 (R 4.5.1). License noted: adapter-only use, no code copied across the GPL-3 boundary.
+## Input: harness SMOKE base_identifiable counts (240 cells x 180 genes, 8 donors), manifest 4befc7656444145543fd26828d5c60404df2755268b63cf48eb45dba7d25811b
+## R output lives OFF the repo (results/scratch/genenmf_smoke/out/, gitignored); this file is the tracked record.
+##
+item	value
+r_version	4.5.1 (Great Square Root)
+genenmf_version	0.9.6
+genenmf_sha	59942b27c2cc2dbf55264b80b4ff26e3188cdf41
+seed	123
+candidate_ranks	2,3,4
+nMP	default(10), remove.empty=TRUE
+normalization	Seurat LogNormalize, data slot
+hvg	findHVG via multiNMF, nfeatures=100
+n_models	24
+n_metaprograms	10
+wall_seconds	2.3
+truth_read_by_adapter	none (K_true never enters the R script)
+##
+## software_status	PASS	(24 models, 10 MPs, conversion checks green)
+## scientific_adoption	NOT_EVALUATED	(smoke only; §5.2 has no gene-set metric — see SOURCE_AUDIT §2.3, deferred to P2-01)
+## evidence_tier	NONE

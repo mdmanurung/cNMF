@@ -590,6 +590,36 @@ Consequences for the baseline and active feature set: none.
 Protocol/data versions superseded: none.
 Independent confirmation needed: re-check on any new host before unblocking.
 
+## D031 — P0-09 unblocked via R4_51: GeneNMF pinned, installed, smoke-tested
+
+Date/time: 2026-09-19, P0-09 session
+Type: implementation (supersedes D030's blocker, which assumed no R existed)
+Related task, feature, gate: P0-09, gate P0
+Context: D030 recorded BLOCKED after finding no system R. The user pointed at
+conda env `R4_51` (R 4.5.1, with Seurat/RcppML/NMF preinstalled) — a separate
+env, so using it leaves `cnmf_bench` and its recorded `environment_hash`
+untouched (the reason pertpy/GeneNMF were never installed into `cnmf_bench`).
+Options considered: (a) keep BLOCKED and wait for a system R; (b) pin, install
+and smoke-test GeneNMF in R4_51 now.
+Decision: **(b).** Pinned `carmonalab/GeneNMF@59942b2` (v0.9.6, GPL-3 —
+adapter-only, no code copied); installed (only `lsa` added, from CRAN);
+`multiNMF`/`getMetaPrograms` traced against the §2 audit and matching it;
+native-workflow R smoke passes (24 models → 10 MPs, 2.3 s) with Python-side
+conversion checks green (`test_comparator.py`, 3 tests).
+Evidence paths and experiment IDs: off-repo clone
+`cnmf-comparators/GeneNMF-59942b2/`; `docs/benchmarks/comparators/
+run_genenmf_smoke.R`; `registry/p0-09_genenmf_smoke.tsv`; SOURCE_AUDIT §2.7.
+Trade-offs and negative evidence: R smoke output lives gitignored under
+`results/scratch/` — the tracked record is the registry TSV, not the
+artifacts. `slot="data"` log-normalisation confirmed, so GeneNMF-side numbers
+are never comparable to cNMF's count-scale metrics without the adapter-derived
+NNLS projection §204 of the brief requires — not built (P2 work). The §2.3
+gene-set metric gap is deferred to P2-01 by amendment, explicitly, not dropped.
+Consequences: P0-09 DONE; `genenmf_full_commit_sha` remains null in configs
+(no comparator *row* exists — smoke is not a row) with this entry as the reason.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>

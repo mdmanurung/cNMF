@@ -190,6 +190,28 @@ The simulator must therefore **span the coverage axis rather than sit at one end
 
 Repository SHA, license verification in situ, installation, and any code inspection remain P0-09 work. Nothing here has been executed and no comparator row may be written until those are done and `genenmf_full_commit_sha` is pinned in the configs (currently `null`, with a recorded reason).
 
+## 2.7 P0-09 execution (R smoke, 2026-09-19)
+
+§2.6's deferred items are now done. Pinned source `carmonalab/GeneNMF`
+`59942b27c2cc2dbf55264b80b4ff26e3188cdf41` (v0.9.6), cloned off-repo to
+`cnmf-comparators/GeneNMF-59942b2/`. License verified in situ: **GPL-3**
+(DESCRIPTION) — hence adapter-only use; no GeneNMF code is copied into this
+repository. Installed into conda env `R4_51` (R 4.5.1; only missing dep was
+`lsa`, installed from CRAN); `cnmf_bench` untouched, so `environment_hash`
+provenance on all tracked rows is unaffected. Code inspected: `multiNMF`
+(R/main.R:43 — per-sample RcppML::nmf over a K vector, Seurat `data` slot,
+own `findHVG`; sample exclusion under `min.cells.per.sample`) and
+`getMetaPrograms` (R/main.R:209 — cosine/Jaccard similarity, ward.D2 hclust
+cut to user-set `nMP`, consensus genes at `min.confidence`, empties removed,
+weights renormalised to sum 1). R smoke (`docs/benchmarks/comparators/
+run_genenmf_smoke.R`): 240×180 SMOKE counts → 24 models (8 donors × k=2:4) →
+10 MPs in 2.3 s; record at `registry/p0-09_genenmf_smoke.tsv`. Two §2
+predictions confirmed in execution: MP weights sum to 1 (asserted in
+`test_comparator.py`), and Seurat rewrites `gene_00001` → `gene-00001`,
+which the conversion check accounts for. Gene-set recovery metric still
+absent from §5.2 by design — no comparator row may be written until P2-01
+adds it by amendment; smoke needs none.
+
 ## 1.6 cNMF API behaviour, measured by running it (P0-03, 2026-09-16)
 
 The traps below were previously recorded from source reading. They have now been
