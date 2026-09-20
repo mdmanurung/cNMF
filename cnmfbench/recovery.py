@@ -43,6 +43,8 @@ __all__ = [
     "program_precision_recall",
     "top2_cosine_gaps",
     "ambiguous_program_count",
+    "top_genes",
+    "recovery_jaccard",
 ]
 
 
@@ -372,3 +374,64 @@ def ambiguous_program_count(gaps, threshold=AMBIGUITY_THRESHOLD):
     if threshold < 0:
         raise ValueError(f"threshold must be >= 0, got {threshold}")
     return int(sum(1 for g in gaps if g < threshold))
+
+
+# ------------------------------------------------- gene-set recovery (v1.2, P4)
+
+TOP_GENES_N = 50  # PROTOCOL §5.5: Gavish et al. 2023 precedent, frozen pre-results.
+
+
+def top_genes(matrix, gene_labels, n=TOP_GENES_N):
+    """Top-`n` genes per program by loading weight. Deterministic: ties resolve
+    to the lexicographically smaller gene label, so the set is a pure function
+    of the matrix rather than of row order or quicksort whims."""
+    matrix = np.asarray(matrix, dtype=float)
+    if matrix.ndim != 2:
+        raise ValueError(f"matrix must be 2-D, got shape {matrix.shape}")
+    if matrix.shape[1] != len(gene_labels):
+        raise ValueError(
+            f"matrix has {matrix.shape[1]} columns but {len(gene_labels)} labels")
+    if not 1 <= int(n) <= len(gene_labels):
+        raise ValueError(f"n must lie in [1, n_genes], got {n}")
+    labels = [str(g) for g in gene_labels]
+    sets = []
+    for row in matrix:
+        order = sorted(range(len(labels)), key=lambda j: (-row[j], labels[j]))
+        sets.append(frozenset(labels[j] for j in order[: int(n)]))
+    return sets
+
+
+def _jaccard(a, b):
+    union = a | b
+    return 1.0 if not union else float(len(a & b) / len(union))
+
+
+def recovery_jaccard(true_sets, fitted_sets):
+    """`program_recovery_jaccard_v1`: Hungarian maximum-weight one-to-one matching
+    on Jaccard similarities, dummy factors absorbing unmatched programs on either
+    side, score `Σ(matched) / max(K_true, K_fitted)` — the cosine metric's
+    discipline (§5.2) transported to gene sets, for whole-workflow comparator
+    rows where full loading vectors do not exist on both sides (SOURCE_AUDIT
+    §2.3). Both arguments are sequences of gene-name sets (frozensets or sets);
+    names are compared as strings. Returns `(score, true_to_fitted, cosines)` —
+    `cosines` carries the matched Jaccard values in the truth's order so that
+    callers reuse one matching object, the way `usage_error` reuses `Alignment`.
+    """
+    t = [set(s) for s in true_sets]
+    f = [set(s) for s in fitted_sets]
+    n_true, n_fitted = len(t), len(f)
+    if n_true < 1 or n_fitted < 1:
+        raise ValueError("need at least one true and one fitted gene set")
+    sim = np.array([[ _jaccard(a, b) for b in f] for a in t])
+    size = max(n_true, n_fitted)
+    padded = np.zeros((size, size), dtype=float)
+    padded[:n_true, :n_fitted] = sim
+    rows, cols = linear_sum_assignment(-padded)
+    true_to_fitted, matched = [None] * n_true, [0.0] * n_true
+    total = 0.0
+    for r, c in zip(rows, cols):
+        if r < n_true and c < n_fitted:
+            true_to_fitted[r] = int(c)
+            matched[r] = float(sim[r, c])
+            total += float(sim[r, c])
+    return float(total / size), tuple(true_to_fitted), tuple(matched)

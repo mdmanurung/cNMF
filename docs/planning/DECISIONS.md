@@ -1021,6 +1021,42 @@ goes through the identical pinned pipeline.
 Protocol/data versions superseded: none.
 Independent confirmation needed: none required for this cycle (upstream finding).
 
+## D045 — v1.2 amendment: gene-set metric for the comparator second cycle
+
+Date/time: 2026-09-20, P4-01 session
+Type: protocol (amendment v1.1 → v1.2)
+Related task, feature, gate: P4 (GeneNMF comparator), SOURCE_AUDIT §2.3
+Context: at the user's direction, GeneNMF's per-sample/meta-program approach
+is finally put to the test. §2.3 named the blocker in advance: §5.2 had no
+gene-set metric, so no comparator row could be written. This amendment adds
+exactly that, plus the hyperparameters a comparison needs — all frozen by
+precedent before any comparator result exists (the only GeneNMF output on
+disk is the P0-09 smoke, which produced no rows).
+Amendment contents (`da68360e…94`):
+1. `program_recovery_jaccard_v1` (§5.2): Hungarian max-weight matching on
+   Jaccard similarities + dummies, score Σ/max(K_true, K_inferred) — the
+   cosine metric's discipline transported to gene sets. Comparator rows only.
+2. §5.5: cNMF side top-50 genes by spectra weight (Gavish precedent);
+   GeneNMF side native MP lists; `nMP = 10` (native default, recorded as
+   unjustified rather than back-justified); HVG `nfeatures = 2000` (native
+   default); ranks 4..10 shared; seed 123. No usage projection (truth marker
+   sets meet the comparator in its own units; adapter-derived scores not built).
+3. `metric_definition_version` 1 → 2; code constants follow
+   (`PROTOCOL_VERSION 1.2`, `METRIC_DEFINITION_VERSION 2` — new run/panel ids
+   live in the v1.2 identity domain; all v1.0.1/1.1 ids bit-stable by test).
+Evidence paths and experiment IDs: `cnmfbench/recovery.py`
+(`top_genes`, `recovery_jaccard`); 6 new tests (tie-breaking, perfect,
+missing/extra penalty, order invariance, empty-side refusal) + twelve-metric
+vocabulary test; suite green at commit.
+Trade-offs and negative evidence: top-50 is as arbitrary as any fixed N — but
+it is Gavish's N, frozen before results, which is what makes it a standard
+rather than a tuning knob. `nMP = 10` inherits the source literature's
+unjustified-ness openly.
+Consequences: comparator rows writable; P4-03 runs GeneNMF on B regimes.
+Protocol/data versions superseded: v1.1 → v1.2. Nothing was produced under
+v1.2 yet; v1.1 evidence keeps its hashes.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>

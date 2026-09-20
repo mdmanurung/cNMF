@@ -6,13 +6,13 @@ revision `5dbc5baaa0b9079b55bce554d801caa235a50457` and stays that way: features
 and C arrive as harness-side switches, not as edits to the algorithm.
 
 The rules this package implements are frozen in `docs/planning/PROTOCOL.md`
-(v1.0.1, sha256 715639895663bc74e7b864bc1cfae60c2fcd05b013e25f23016d45e86f4f9ca5).
+(v1.2 — see D045; the sha256 recorded in `ablation_plan.yaml` is authoritative).
 Where a docstring cites a section number it means that file.
 """
 
-PROTOCOL_VERSION = "1.0.1"
+PROTOCOL_VERSION = "1.2"
 HASH_CONVENTION_VERSION = 1
-METRIC_DEFINITION_VERSION = 1
+METRIC_DEFINITION_VERSION = 2
 
 # Pinned upstream, per PROTOCOL.md header and DECISIONS.md D002.
 UPSTREAM_CNMF_SHA = "5dbc5baaa0b9079b55bce554d801caa235a50457"

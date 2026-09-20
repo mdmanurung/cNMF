@@ -44,10 +44,15 @@ def test_experiments_schema_matches_the_committed_header_exactly():
     assert R.EXPERIMENTS_COLUMNS == _header("EXPERIMENTS.tsv")
 
 
-def test_exactly_the_eleven_protocol_metrics_are_allowed():
-    assert len(R.METRIC_DIRECTION) == 11
+def test_exactly_the_twelve_protocol_metrics_are_allowed():
+    assert len(R.METRIC_DIRECTION) == 12
     with pytest.raises(ValueError, match="not one of PROTOCOL"):
         R.result_row(**_ok_result(metric="silhouette"))
+
+
+def test_jaccard_metric_is_writable_with_higher_direction():
+    row = R.result_row(**_ok_result(metric="program_recovery_jaccard_v1"))
+    assert row["direction"] == "higher_is_better"
 
 
 def test_direction_uses_the_section_5_1_strings():

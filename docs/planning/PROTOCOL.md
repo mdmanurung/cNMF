@@ -1,8 +1,8 @@
 # PROTOCOL — frozen benchmark and selection rules
 
-`protocol_version: 1.1`
+`protocol_version: 1.2`
 `hash_convention_version: 1`
-`metric_definition_version: 1`
+`metric_definition_version: 2`
 State: **FROZEN** (see §9 for what "frozen" permits and forbids)
 Pinned upstream: `dylkot/cNMF` @ `5dbc5baaa0b9079b55bce554d801caa235a50457` (cNMF 1.7.1)
 
@@ -384,7 +384,7 @@ name not listed in §5.2 may not be written. Every row carries `metric_definitio
 
 The `independent_unit_type` for primary endpoints is `donor`, per §3.5.
 
-### 5.2 Vocabulary (`metric_definition_version: 1`)
+### 5.2 Vocabulary (`metric_definition_version: 2`)
 
 | `metric` | `direction` | Definition |
 |---|---|---|
@@ -400,6 +400,7 @@ The `independent_unit_type` for primary endpoints is `donor`, per §3.5.
 | `cpu_seconds_v1` | lower | CPU time; `memory_scope` in `EXPERIMENTS.tsv` records what was measured |
 | `peak_memory_mb_v1` | lower | Peak RSS; scope as above |
 | `failed_fits_v1` | lower | Count of fits that did not complete; always emitted, including as 0 |
+| `program_recovery_jaccard_v1` | higher | Gene-set sibling of the cosine metric (v1.2, second cycle): Hungarian maximum-weight one-to-one matching on **Jaccard similarities between gene sets**, with dummy factors absorbing unmatched components; score `Σ(matched Jaccard) / max(K_true, K_inferred)`. True side: simulator marker sets; fitted side: top genes per program (see §5.5). For whole-workflow comparator rows only — never a cNMF-vs-cNMF endpoint. |
 
 **Threshold calibration, P1-01 (D033).** Both constants were set on DEVELOPMENT
 controls only (`p04-dev-000m`, configuration 000, both outer folds at
@@ -424,6 +425,26 @@ scoring_failed}` (blank = true null, `NOT_COMPUTED` = could not be produced);
 filter on any aggregation; `arm ∈ {full_training_pool, matched_budget,
 upstream_full_data, genenmf_native}`. No rule changes — this section writes
 down what the writer already enforces.
+
+### 5.5 Gene-set reduction and comparator hyperparameters (v1.2, frozen pre-results)
+
+The Jaccard metric needs gene *sets* on both sides, and the reductions below
+are frozen by published precedent — not tuned, since no comparator row exists
+yet and the constants below were written before any was produced:
+
+- **cNMF side: top 50 genes** per consensus program by spectra weight (Gavish et
+  al. 2023 precedent). No specificity weighting, no weight-explained cutoff.
+- **GeneNMF side: native meta-program gene lists** (`metaprograms.genes`) from
+  the native `multiNMF → getMetaPrograms` workflow.
+- **`nMP = 10`** (GeneNMF native default; the BCC paper's target with no stated
+  rationale — recorded as unjustified rather than back-justified).
+- **HVG input: native default `nfeatures = 2000`**; ranks `k = 4..10` (the
+  DEVELOPMENT candidate grid, shared for comparability); seed 123 (GeneNMF
+  default policy); Seurat LogNormalize `data` slot.
+- GeneNMF-side truth comparison needs no usage projection: simulator marker
+  sets are gene sets natively, so truth meets the comparator in its own units.
+  Any NNLS-projected usage score would be labeled adapter-derived (§204 of the
+  brief) and is not built in this cycle.
 
 Cost metrics are reported for every configuration, always, so that a gain is never assessed
 without its price (`cost_cap` lives in the feature contracts).

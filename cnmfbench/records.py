@@ -70,8 +70,9 @@ EXPERIMENTS_COLUMNS = (
     "memory_scope", "failure_reason", "notes",
 )
 
-# PROTOCOL §5.2, exactly 11 names. §5.1: "a metric name not listed in §5.2 may not be
-# written". The direction strings are §5.1's forms, not §5.2's table's bare lower/higher.
+# PROTOCOL §5.2, twelve names at metric_definition_version 2 (v1.2 adds the
+# gene-set sibling for whole-workflow comparator rows; §5.1 still forbids names
+# not on this list). The direction strings are §5.1's forms.
 METRIC_DIRECTION = {
     "heldout_squared_prediction_error_v1": "lower_is_better",
     "heldout_squared_prediction_error_counts_v1": "lower_is_better",
@@ -79,6 +80,7 @@ METRIC_DIRECTION = {
     "program_recovery_cosine_v1": "higher_is_better",
     "program_precision_v1": "higher_is_better",
     "program_recall_v1": "higher_is_better",
+    "program_recovery_jaccard_v1": "higher_is_better",
     "usage_error_v1": "lower_is_better",
     "wall_seconds_v1": "lower_is_better",
     "cpu_seconds_v1": "lower_is_better",

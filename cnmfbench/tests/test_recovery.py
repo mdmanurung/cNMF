@@ -311,3 +311,58 @@ def test_duplicated_factors_produce_small_gaps():
     truth = _truth()
     dup = Spectra(np.vstack([truth.matrix, truth.matrix[0:1]]), "count", truth.gene_labels)
     assert min(top2_cosine_gaps(truth, dup)) == pytest.approx(0.0, abs=1e-12)
+
+
+def test_top_genes_returns_n_labels_by_descending_weight():
+    import numpy as np
+
+    from cnmfbench.recovery import top_genes
+
+    m = np.array([[0.1, 0.5, 0.3, 0.2]])
+    assert top_genes(m, ("g0", "g1", "g2", "g3"), n=2) == [frozenset({"g1", "g2"})]
+
+
+def test_top_genes_breaks_weight_ties_lexicographically():
+    import numpy as np
+
+    from cnmfbench.recovery import top_genes
+
+    m = np.array([[0.5, 0.5, 0.5]])
+    assert top_genes(m, ("gb", "ga", "gc"), n=2) == [frozenset({"ga", "gb"})]
+
+
+def test_jaccard_perfect_recovery_scores_one():
+    from cnmfbench.recovery import recovery_jaccard
+
+    truth = [frozenset({"a", "b", "c"}), frozenset({"d", "e"})]
+    score, matching, matched = recovery_jaccard(truth, list(truth))
+    assert score == 1.0
+    assert matching == (0, 1)
+
+
+def test_jaccard_penalises_a_missing_and_an_extra_program():
+    from cnmfbench.recovery import recovery_jaccard
+
+    truth = [frozenset({"a", "b"}), frozenset({"c", "d"})]
+    fitted = [frozenset({"a", "b"}), frozenset({"x", "y"}), frozenset({"c"})]
+    score, _, matched = recovery_jaccard(truth, fitted)
+    # best matching: 1.0 + 1/2, divided by max(2, 3)
+    assert score == (1.0 + 0.5) / 3.0
+    assert matched[0] == 1.0
+
+
+def test_jaccard_is_invariant_to_program_order():
+    from cnmfbench.recovery import recovery_jaccard
+
+    truth = [frozenset({"a", "b"}), frozenset({"c", "d", "e"})]
+    fitted = [frozenset({"c", "d", "e"}), frozenset({"a", "b"})]
+    assert recovery_jaccard(truth, fitted)[0] == 1.0
+
+
+def test_jaccard_rejects_an_empty_side():
+    import pytest
+
+    from cnmfbench.recovery import recovery_jaccard
+
+    with pytest.raises(ValueError, match="at least one"):
+        recovery_jaccard([], [frozenset({"a"})])
