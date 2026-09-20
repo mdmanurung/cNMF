@@ -1,0 +1,10 @@
+scenario	side	fold	score	n_true	n_fitted	detail
+B_imbalanced	genenmf	pooled	0.3647	7	10	matched=0.461,0.546,0.594,0.525,0.596,0.537,0.387
+B_imbalanced	cnmf_top50_k7	outer_0	0.3985	7	7	matched=0.371,0.405,0.393,0.393,0.405,0.417,0.405
+B_imbalanced	cnmf_top50_k7	outer_1	0.3937	7	7	matched=0.360,0.393,0.371,0.417,0.405,0.417,0.393
+B_balanced	genenmf	pooled	0.3254	7	10	matched=0.495,0.477,0.350,0.570,0.497,0.468,0.397
+B_balanced	cnmf_top50_k7	outer_0	0.4001	7	7	matched=0.382,0.405,0.382,0.393,0.417,0.417,0.405
+B_balanced	cnmf_top50_k7	outer_1	0.3872	7	7	matched=0.360,0.393,0.360,0.405,0.393,0.417,0.382
+B_context	genenmf	pooled	0.3441	7	9	matched=0.469,0.341,0.448,0.612,0.456,0.385,0.385
+B_context	cnmf_top50_k7	outer_0	0.3937	7	7	matched=0.371,0.405,0.405,0.382,0.405,0.417,0.371
+B_context	cnmf_top50_k7	outer_1	0.3954	7	7	matched=0.371,0.405,0.360,0.393,0.417,0.417,0.405

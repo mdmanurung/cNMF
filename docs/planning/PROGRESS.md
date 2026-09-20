@@ -10,7 +10,7 @@
 | Field | Current value |
 |---|---|
 | Active prototype | P0 — loop closes at SMOKE and DEVELOPMENT; P0-04 metrics **wired into the runner**; features B and C switchable and exercised at both tiers; nested donor folds and the §3.2 leakage audit implemented and tested against real fits (P0-05); P0-06's selector is implemented and `delta` calibrated (D026), PROTOCOL still v1.0.1; **P0-07 DONE** (cache/restart + smoke workflow, fence four → three, D027) |
-| Active task | P4-03 (GeneNMF runs on B regimes + cNMF gene-set scoring — amendment committed pre-results) |
+| Active task | None — first cycle (31/31) and comparator second cycle (P4-01–04) both COMPLETE. Re-entry only via new decisions |
 | Next task | **P0-08** — register a public multi-donor dataset and verify metadata (dependency P0-02 now DONE; or record an explicit external blocker) |
 | P0-02 note | P0-02 is DONE (schemas + manifest example + unit tags, D028); its dependency slot for P0-08/P0-09 is satisfied. P0-05/P0-06 proceeded around it by recorded deviation (D018/D021/D026); that history stands and is not rewritten. |
 | P0-06 note | **P0-06 is DONE** (closed by the v1.1 amendment, D033). The tension is resolved the way the dashboard allowed: P1-01 ran the amendment as its first act, with P0-10 already closed — no dependency was edited, the ordering P0-10 → P1-01 → (P0-06 closes) is exactly what happened. |
@@ -645,8 +645,8 @@ are tracked separately (4 tasks, IN_PROGRESS: P4-03).
 |---|---|---|---|---|
 | P4-01 | v1.2 amendment (gene-set metric) + frozen comparator hyperparameters | M1-04 | DONE | PROTOCOL v1.2 (`da68360e…`), §5.2 Jaccard row + §5.5 (top-50, nMP=10, native defaults), metric_definition_version 2, D045 — committed before any comparator result |
 | P4-02 | Gene-set metric implementation + tests | P4-01 | DONE | `top_genes` + `recovery_jaccard` with matching discipline; 6 tests + vocabulary test; suite green |
-| P4-03 | GeneNMF runs on B regimes + cNMF gene-set scoring | P4-02 | IN_PROGRESS | Native R runs (imbalanced/balanced/context DEVELOPMENT) + top-50 scoring + report TSV |
-| P4-04 | Comparator gate (KEEP/CONDITIONAL/DROP/INCONCLUSIVE for the comparison, not for GeneNMF) | P4-03 | TODO | Gate file with paired Jaccard effects; no cNMF-vs-cNMF claim touched |
+| P4-03 | GeneNMF runs on B regimes + cNMF gene-set scoring | P4-02 | DONE | 3 native R runs (168 models each) + top-50 scoring → `registry/p4-03_comparator.tsv` (registry only, no benchmark rows). One scoring bug (name separators) caught and fixed pre-report |
+| P4-04 | Comparator gate (KEEP/CONDITIONAL/DROP/INCONCLUSIVE for the comparison, not for GeneNMF) | P4-03 | DONE | **INCONCLUSIVE** by construction (D046, `gates/P4.md`): aggregate favors cNMF (count effect), per-program favors GeneNMF; no margins frozen, no cNMF claim touched |
 
 Scope guard: this cycle tests GeneNMF's approach against cNMF programs on gene
 sets. It cannot promote, demote, or reopen A/B/C (all decided), change any

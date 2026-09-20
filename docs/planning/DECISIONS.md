@@ -1057,6 +1057,36 @@ Protocol/data versions superseded: v1.1 → v1.2. Nothing was produced under
 v1.2 yet; v1.1 evidence keeps its hashes.
 Independent confirmation needed: no.
 
+## D046 — P4-04: comparator INCONCLUSIVE by construction; aggregate vs per-program split
+
+Date/time: 2026-09-20, P4-04 session
+Type: scientific adoption (comparator gate)
+Related task, feature, gate: P4-04, gate P4
+Context: 3 native GeneNMF runs (168 models each, ~100 s, all exit 0) + cNMF
+top-50 scoring, all frozen pre-results (§5.5). One scoring bug caught by its
+own output (all-zero table from an underscore/dash name mismatch — fixed,
+rerun; the zero table is not reported as a result anywhere).
+Findings: aggregate Jaccard favors cNMF (0.39–0.40 vs 0.33–0.36) while
+per-program Jaccards favor GeneNMF MPs (6/7 programs, up to 0.61 vs 0.42).
+Both true simultaneously: the aggregate prices program count (÷10 vs ÷7) and
+GeneNMF, which never selects rank, emits 10. No margins were frozen (adoption
+never on the table), so no threshold adjudicates the split.
+Decision: **INCONCLUSIVE** — descriptive numbers stand, no adoption implication
+drawn, no cNMF claim touched. Consistent with B-DROP from an independent
+method family (donor-aware discovery shows no advantage at this scale), but
+that consistency is corroboration, not confirmation (single seed, asymmetric
+K handling, no margins).
+Evidence paths and experiment IDs: `registry/p4-03_comparator.tsv`;
+`gates/P4.md`; R provenance JSONs beside the outputs (gitignored scratch).
+Trade-offs and negative evidence: single dataset realisation per scenario;
+cNMF read at true rank (unavoidable — A dropped leaves no selector); GeneNMF
+pooled across donors while cNMF scored per fold (truth is dataset-global, so
+both meet the same markers, but the aggregation differs — stated in the gate).
+Consequences: P4 cycle closed (P4-01–04 DONE). The comparator stays available
+for future real-data work; any adoption use needs margins frozen first.
+Protocol/data versions superseded: none (v1.2 applied, not altered).
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>
