@@ -270,17 +270,18 @@ def test_every_provisional_component_names_a_real_ledger_task():
 
 
 def test_calling_a_provisional_component_records_it():
-    """A still-fenced component exercises the touched-tracking. (`outer_donor_folds`
-    was un-fenced at D036 after the first real A-ON run; `discovery_sample_b`
-    remains fenced under P2-01.)"""
-    from cnmfbench.features import discovery_sample
+    """A still-fenced component exercises the touched-tracking. (`discovery_sample_b`
+    was un-fenced at D041 after the replicate chain reported the draw's variance;
+    `consensus_c` remains fenced under P3-01.)"""
+    from cnmfbench.features import consensus_spectra_from_bank
 
     P.reset_touched()
     assert P.touched() == ()
-    discovery_sample(
-        [f"cell_{i}" for i in range(6)], ["d0"] * 3 + ["d1"] * 3,
-        budget=4, equal_per_donor=True, seed=1)
-    assert "features.discovery_sample_b" in P.touched()
+    import numpy as np
+    import pandas as pd
+    bank = pd.DataFrame(np.full((8, 3), 0.25))
+    consensus_spectra_from_bank(bank, 2, 2.0, 4, one_per_run=False)
+    assert "features.consensus_c" in P.touched()
 
 
 def test_cited_rows_check_is_scoped_not_a_whole_file_scan():

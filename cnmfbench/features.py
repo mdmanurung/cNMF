@@ -175,7 +175,6 @@ class DiscoverySample:
         return len(self.cell_ids)
 
 
-@provisional("features.discovery_sample_b")
 def discovery_sample(cell_ids, donor_ids, budget, equal_per_donor, seed):
     """Choose the discovery cells. `equal_per_donor` is feature B.
 

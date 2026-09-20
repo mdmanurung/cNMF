@@ -890,6 +890,40 @@ Consequences: P2-02/P2-03 DONE; P2-04 runs the chain.
 Protocol/data versions superseded: none.
 Independent confirmation needed: no.
 
+## D041 — P2-04/05: B DROPPED (no gain, no harm); draw un-fenced on replicates
+
+Date/time: 2026-09-19, P2-04/05 session
+Type: scientific adoption + implementation
+Related task, feature, gate: P2-04, P2-05, gate P2, feature B
+Context: 24 DEVELOPMENT runs (4 scenarios × 2 arms × 3 replicates), all exit
+0, merged collision-free (22,654/592 tracked). Fixed ranks; count-unit
+endpoints; shared budgets; same folds/panels/seeds.
+Findings (K_true=7, equal-donor-mean count units): primary deltas +0.6/+0.5
+(base), +1.3/−3.1 (imbalanced target), +2.9/+0.3 (context) vs margin 70 —
+more than an order of magnitude short everywhere. Recovery harm ≤4e-4
+(margin 0.01), usage harm ≤7e-3 (margin 0.05), cost 0.93–1.00× (cap 5×).
+Draw variance across replicates ~0.2% — measured negligible, which is exactly
+what `features.discovery_sample_b`'s hardening required: decorator + entry
+removed here, fence two → one (only `features.consensus_c` remains).
+100/110 and selected-rank B omitted by design: A is dropped and its selector
+overselects, so those cells would measure A's harm, not B (recorded in the
+registry analysis, not silently skipped).
+Decision: **DROP** — no worthwhile benefit in any regime including the
+imbalanced target, with no offsetting harm; default stays proportional.
+Scope: DEVELOPMENT simulation, 24 donors, fixed rank. Real-data scale
+(hundreds of donors) explicitly untested and outside the verdict either way.
+Subgroup margin NOT_SET (no metric); context numbers overlap with no visible
+degradation but bind nothing.
+Evidence paths and experiment IDs: `registry/p2-04_b_comparisons.tsv`;
+`gates/P2.md`; 290 harness tests pass.
+Trade-offs and negative evidence: B_balanced replicates its base numbers
+exactly (same dataset+seeds by construction) — a determinism confirmation,
+not an independent regime. n=2 folds × 3 reps per cell is modest; the effect
+sizes are 10–100× below margins, so precision is not the binding constraint.
+Consequences: P2-04/P2-05 DONE; P3-01 next.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no (DROP on development evidence).
+
 ## Entry template
 
 ### D<id> — <title>

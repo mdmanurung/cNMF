@@ -63,21 +63,6 @@ PROVISIONAL = {
             "is claimed at, and the tie-break rule either fixed in the ablation plan or "
             "shown not to change the C effect.",
         ),
-        ProvisionalComponent(
-            component_id="features.discovery_sample_b",
-            owner_task="P2-01",
-            reason="Feature B's matched-budget draw. The redistribution rule for donors "
-            "holding fewer cells than their equal share is this implementation's choice. "
-            "`hold_preprocessing_constant_across_B` holds for G — frozen into both arms via "
-            "`prepare(genes_file=...)`, verified byte-identical — and CANNOT hold for s_g, "
-            "which `cnmf.prepare` computes from whichever cells the rule drew; measured "
-            "drift median 1.04, max 1.24. See D016.",
-            hardening_requires="Sampling replicates, so the draw's variance is reported "
-            "rather than assumed negligible — currently one draw per arm, which is why B is "
-            "INCONCLUSIVE and not 'no effect'. NOT an audit asserting s_g identical across "
-            "arms: D016 shows that cannot be met while `src/cnmf/**` is unmodifiable. The "
-            "drift is reported instead, and cross-arm endpoints are read in count units.",
-        ),
     ]
 }
 

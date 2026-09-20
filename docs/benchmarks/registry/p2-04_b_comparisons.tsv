@@ -1,0 +1,43 @@
+## P2-04 B comparisons, 2026-09-19. 000 vs 010, matched_budget arm, shared budgets.
+##
+## 24 DEVELOPMENT runs (4 scenarios x 2 arms x 3 sampling replicates), sequential chain,
+## exit 0 throughout, merged cleanly (no id collisions). Fixed ranks [4..10]; K_true=7.
+## All cross-arm endpoints in COUNT units (contracts/B.md, D016).
+##
+## Draw variance across replicates (equal-donor-mean count-unit primary at K=7):
+## rep spread ~1-2 units on ~1000 (~0.2%) in every cell — negligible, and now measured
+## rather than assumed (this closes the fence item on features.discovery_sample_b).
+##
+## ---- PRIMARY: heldout_squared_prediction_error_counts_v1, equal-donor mean, K=7 ----
+## (margin 70; 3 rows per cell = rep0/1/2)
+## scenario           fold     000                    010                    delta(010-000)
+## base_identifiable  outer_0  989.0 990.3 990.5      989.6 990.1 991.7      +0.6
+## base_identifiable  outer_1  903.5 903.8 904.3      904.1 904.1 904.9      +0.5
+## B_imbalanced       outer_0  1112.8 1114.1 1116.6   1114.9 1115.9 1116.5   +1.3
+## B_imbalanced       outer_1  1201.1 1201.1 1202.1   1196.5 1198.5 1200.0   -3.1
+## B_balanced         outer_0  = base (same dataset+seeds; determinism check) =
+## B_balanced         outer_1  = base =
+## B_context          outer_0  1017.5 1019.5 1021.6   1021.4 1022.1 1023.6   +2.9
+## B_context          outer_1  1167.1 1167.2 1167.5   1166.9 1167.6 1168.3   +0.3
+##
+## No cell reaches margin 70 (largest |delta| 3.1). Target regime (imbalanced) included.
+##
+## ---- RECOVERY (margin: harm <= 0.01) ----
+## All 6 matched pairs per scenario overlap to ~4e-4 (imbalanced 000 0.9828-0.9837
+## vs 010 0.9824-0.9843; context 000 0.9754-0.9811 vs 010 0.9755-0.9814). No harm.
+##
+## ---- USAGE (margin: harm <= 0.05) ----
+## Max paired harm ~0.007 (context). No harm.
+##
+## ---- COST (cap 5x paired wall): 010/000 = 0.93-1.00. Pass. ----
+##
+## ---- OMITTED BY DESIGN ----
+## 100/110 (B under A-ON): A is DROPPED and its selector overselects to the grid
+## edge (gates/P1.md) — a B comparison under it would measure A's harm, not B.
+## Selected-rank B: same reason (no operative selector while A is dropped).
+## Rare-program metric: still absent (subgroup margin NOT_SET); context recovery
+## numbers above show no degradation but cannot bind a margin that does not exist.
+##
+## software_status	PASS	(24/24 exit 0; G byte-identical across arms per run)
+## scientific_adoption	see gate P2 (P2-05)
+## evidence_tier	DEVELOPMENT (fixed rank; no confirmation run — nothing is promoted)
