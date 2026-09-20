@@ -22,9 +22,10 @@ def test_all_eight_scenarios_are_specified():
     assert len(SCENARIOS) == 8
 
 
-def test_exactly_the_six_planned_scenarios_are_implemented():
+def test_all_eight_planned_scenarios_are_implemented():
     assert set(list_implemented()) == {"base_identifiable", "A_weak", "A_null",
-                                       "B_imbalanced", "B_balanced", "B_context"}
+                                       "B_imbalanced", "B_balanced", "B_context",
+                                       "C_duplicate_merge", "C_separated"}
 
 
 def test_every_scenario_states_which_feature_it_tests():
@@ -33,11 +34,11 @@ def test_every_scenario_states_which_feature_it_tests():
         assert s["rationale"].strip(), name
 
 
-def test_unimplemented_scenario_raises_rather_than_falling_back():
-    # A silent fallback would produce a RESULTS.tsv row labelled C_separated that was
-    # generated under base_identifiable, and nothing downstream could detect it.
-    with pytest.raises(NotImplementedError):
-        get_scenario("C_separated")
+def test_unknown_scenario_still_raises_rather_than_falling_back():
+    # All eight planned scenarios are implemented; an unknown name must still
+    # raise rather than silently substituting base_identifiable.
+    with pytest.raises((NotImplementedError, KeyError)):
+        get_scenario("C_separated_extra")
 
 
 def test_unknown_scenario_raises():
@@ -51,7 +52,8 @@ def test_unknown_tier_raises():
 
 
 @pytest.mark.parametrize("name", ["base_identifiable", "A_weak", "A_null",
-                                   "B_imbalanced", "B_balanced", "B_context"])
+                                   "B_imbalanced", "B_balanced", "B_context",
+                                   "C_duplicate_merge", "C_separated"])
 @pytest.mark.parametrize("tier", ["SMOKE", "DEVELOPMENT"])
 def test_implemented_scenarios_build_valid_params(name, tier):
     p = build_params(name, tier)

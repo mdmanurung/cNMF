@@ -924,6 +924,40 @@ Consequences: P2-04/P2-05 DONE; P3-01 next.
 Protocol/data versions superseded: none.
 Independent confirmation needed: no (DROP on development evidence).
 
+## D042 — P3-01/02/03: C frozen, scenarios live, no-op and incomplete-run properties
+
+Date/time: 2026-09-19, P3-01/02/03 session
+Type: protocol (contract freeze) + implementation
+Related task, feature, gate: P3-01, P3-02, P3-03, feature C
+Context: no `contracts/C.md` existed; C_duplicate_merge/C_separated were
+specified-but-raising; D015's tie-break stood unfixed; no-op and incomplete-run
+behaviour unasserted.
+Decision and build:
+- `contracts/C.md` FROZEN (v1.1): centroid-nearest one-vote rule (fixes D015 on
+  the plan side; mean-vote recorded as deferred sensitivity), comparisons
+  000v001 + 010v011 at fixed K>K_true (pilot: C fires only above K_true; at
+  K_true C-ON≡C-OFF bitwise), identical-bank assertion, 100/101+110/111
+  omitted (would measure dropped-A harm), no selected-rank C while A is
+  dropped. Margins mirror the tier family (30/0.01/0.05/5×) with the
+  stated justification (SEs are tier properties); aggregation provenance
+  reported unmargined; no CONDITIONAL scope pre-registered.
+- C scenarios enabled (generative only); all 8 scenarios now implemented.
+- P3-03 tests: no-op bitwise identity when no run duplicates + NaN-bank
+  refusal (both green on first run); OFF-path upstream pinning pre-existed.
+- 10 DEVELOPMENT configs (base reuses existing 000m/010m/001/011; C scenarios
+  get 000/001/010/011): same cells/seeds/budgets across each C pair.
+Evidence paths and experiment IDs: `contracts/C.md`; `test_features.py`
+(+2 tests); dry-run green on a C_duplicate_merge config.
+Trade-offs and negative evidence: margins reuse the tier family rather than
+re-deriving per feature — stated as a choice (re-deriving per comparison
+would be constant-tuning). The KEEP bar needs a gain at K>K_true in
+C_duplicate_merge, the hardest place for it.
+Consequences: P3-01/02/03 DONE; P3-04 runs the 10-config chain
+(base 001/011 exist as rows already — rerun for the current-code bank check,
+not reused on trust).
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>

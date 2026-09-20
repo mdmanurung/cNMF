@@ -10,7 +10,7 @@
 | Field | Current value |
 |---|---|
 | Active prototype | P0 — loop closes at SMOKE and DEVELOPMENT; P0-04 metrics **wired into the runner**; features B and C switchable and exercised at both tiers; nested donor folds and the §3.2 leakage audit implemented and tested against real fits (P0-05); P0-06's selector is implemented and `delta` calibrated (D026), PROTOCOL still v1.0.1; **P0-07 DONE** (cache/restart + smoke workflow, fence four → three, D027) |
-| Active task | P3-01 (freeze C contract + identical-factor-bank comparisons — P2 complete: B DROPPED) |
+| Active task | P3-04 (C comparisons — DEVELOPMENT chain over 10 configs) |
 | Next task | **P0-08** — register a public multi-donor dataset and verify metadata (dependency P0-02 now DONE; or record an explicit external blocker) |
 | P0-02 note | P0-02 is DONE (schemas + manifest example + unit tags, D028); its dependency slot for P0-08/P0-09 is satisfied. P0-05/P0-06 proceeded around it by recorded deviation (D018/D021/D026); that history stands and is not rewritten. |
 | P0-06 note | **P0-06 is DONE** (closed by the v1.1 amendment, D033). The tension is resolved the way the dashboard allowed: P1-01 ran the amendment as its first act, with P0-10 already closed — no dependency was edited, the ordering P0-10 → P1-01 → (P0-06 closes) is exactly what happened. |
@@ -31,8 +31,8 @@
 ## 2. Progress counts
 
 **9 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05, P0-07, P0-02).  
-**22 / 31 tasks DONE** (S0×3, P0×10, P0-06, P1×4, P2×5).  
-TODO: 9 (P3-01–05, M1-01–04) · IN_PROGRESS: 1 (P3-01 — active) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0. Features A/B: DROPPED at DEVELOPMENT
+**25 / 31 tasks DONE** (S0×3, P0×10, P0-06, P1×4, P2×5, P3-01, P3-02, P3-03).  
+TODO: 6 (P3-04–05, M1-01–04) · IN_PROGRESS: 1 (P3-04 — chain queued) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0. Features A/B: DROPPED at DEVELOPMENT
 
 Scientific adoption remains separate and untouched. P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance; S0-03 establishes the rules by which future evidence will be judged; the skeleton establishes that the loop executes end to end. **None of that is evidence for any feature.** Benchmark numbers now exist, but only at SMOKE tier, from fenced throwaway components, for the reference configuration `000` — there is nothing to compare them against, and `smoke_can_promote_feature: false` forbids using them if there were.
 
@@ -82,10 +82,10 @@ Update status and evidence after each meaningful code/test batch. A task is DONE
 | P2-03 | P2 | Test budgets, refit isolation and context-preservation safeguards | P2-02 | DONE | Determinism/seed-sensitivity/exact-budget/redistribution/over-budget-refusal unit tests + SMOKE imbalanced pair with byte-identical G (`test_discovery.py`, D039) |
 | P2-04 | P2 | Run balanced/imbalanced/subgroup B comparisons | P2-03 | DONE | 24 DEVELOPMENT runs (4 scenarios × 2 arms × 3 reps), all exit 0, merged collision-free. Primary |Δ| ≤ 3.1 (margin 70); recovery/usage/cost pass (D041) |
 | P2-05 | P2 | Close B software and scientific adoption decisions | P2-04 | DONE | **DROP** (D041, `gates/P2.md`): no benefit anywhere incl. imbalanced target, no harm, cost ~1×. Scope: DEVELOPMENT fixed-rank. Draw un-fenced on replicates; 100/110 omitted (would measure dropped-A harm) |
-| P3-01 | P3 | Freeze C contract and identical-factor-bank comparisons | P2-05 | IN_PROGRESS | Started 2026-09-19: tie-break rule decision (D015's open item), C margins, corruption + natural comparison plan |
-| P3-02 | P3 | Implement one-per-run-per-cluster aggregation only | P3-01 | TODO | C switch; provenance of retained/omitted factors; unchanged surrounding steps — **not yet available** |
-| P3-03 | P3 | Test C constraint, no-op, invariance and incomplete-run handling | P3-02 | TODO | Property tests; identical output when constraint already holds — **not yet available** |
-| P3-04 | P3 | Run corruption and natural end-to-end C comparisons | P3-03 | TODO | Paired C off/on evidence for all AB backgrounds; target/safeguard results — **not yet available** |
+| P3-01 | P3 | Freeze C contract and identical-factor-bank comparisons | P2-05 | DONE | `contracts/C.md` FROZEN (v1.1): centroid-nearest rule (D015 closed plan-side), 000v001+010v011 at fixed K>K_true, identical-bank assertion, margins 30/0.01/0.05/5× (D042) |
+| P3-02 | P3 | Implement one-per-run-per-cluster aggregation only | P3-01 | DONE | Pre-existed (`features.py`); C scenarios enabled (all 8 live); tie-break frozen in contract (D042) |
+| P3-03 | P3 | Test C constraint, no-op, invariance and incomplete-run handling | P3-02 | DONE | No-op bitwise identity + NaN refusal added; OFF-path upstream pinning + dedup mechanics pre-existed (D042) |
+| P3-04 | P3 | Run corruption and natural end-to-end C comparisons | P3-03 | IN_PROGRESS | Started 2026-09-19: sequential chain over 10 DEVELOPMENT configs (base/C_duplicate_merge/C_separated × 000/001/010/011); bank-hash assertion + analysis on completion |
 | P3-05 | P3 | Close C software and scientific adoption decisions | P3-04 | TODO | P3 gate with negative evidence, cost and adoption scope — **not yet available** |
 | M1-01 | Milestone | Run full factorial plus anchors and interaction report | P3-05 | TODO | 8 configurations; fixed-rank controls; paired effects; failures retained — **not yet available** |
 | M1-02 | Milestone | Freeze recommended configuration and run independent confirmation | M1-01 | TODO | Frozen hashes and untouched evidence; explicit limits if blocked — **not yet available** |

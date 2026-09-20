@@ -175,3 +175,24 @@ def test_an_impossible_budget_raises():
     ids, donors = _cells({"d0": 10})
     with pytest.raises(ValueError, match="outside"):
         discovery_sample(ids, donors, 99, True, seed=1)
+
+
+def test_c_on_is_identical_when_no_run_contributes_twice():
+    """P3-03 no-op property: where the constraint already holds, C changes nothing.
+    (End-to-end this is why C-ON == C-OFF bitwise at/below K_true.)"""
+    bank = _tiny_bank()
+    off, _ = consensus_spectra_from_bank(bank, k=4, density_threshold=2.0, n_iter=8)
+    on, info = consensus_spectra_from_bank(bank, k=4, density_threshold=2.0, n_iter=8,
+                                           one_per_run=True)
+    assert info["n_dropped_duplicate_contributions"] == 0
+    assert np.array_equal(np.sort(off.values, axis=0), np.sort(on.values, axis=0))
+
+
+def test_c_refuses_a_bank_with_a_failed_fit_rather_than_dropping_it_silently():
+    """P3-03 incomplete-run handling: a NaN factor (failed optimizer run) must raise,
+    never vanish from the consensus without a recorded reason."""
+    bank = _tiny_bank()
+    bank.iloc[0, :] = np.nan
+    with pytest.raises(ValueError, match="[Nn]aN"):
+        consensus_spectra_from_bank(bank, k=4, density_threshold=2.0, n_iter=8,
+                                    one_per_run=True)

@@ -1,4 +1,4 @@
-"""The scenario registry: all 8 specified now, 6 implemented (B trio at P2-02).
+"""The scenario registry: all 8 specified now, all 8 implemented (B trio at P2-02, C pair at P3-02).
 
 All eight are specified **before features B and C exist**, so that no scenario can be
 shaped around the behaviour of the feature it is meant to test. That is the whole point
@@ -183,7 +183,7 @@ SCENARIOS = {
         ),
     ),
     "C_duplicate_merge": dict(
-        implemented=False,
+        implemented=True,
         feature="C",
         overrides=dict(marker_overlap_fraction=1.0 / 3.0, lambda_separation=2.5),
         rationale=(
@@ -193,7 +193,7 @@ SCENARIOS = {
         ),
     ),
     "C_separated": dict(
-        implemented=False,
+        implemented=True,
         feature="C",
         overrides=dict(marker_overlap_fraction=0.0, lambda_separation=6.0),
         rationale=(
