@@ -210,15 +210,14 @@ def test_shared_fit_cost_is_attributed_exactly_once():
 
 
 def test_every_written_row_is_provisional_and_cannot_promote():
-    """While the fence stands, every row must say so and must sit at a tier that cannot
-    promote a feature. The two must not drift apart."""
+    """Historical rows stay `ok_provisional` forever — correctly, since fenced code
+    produced them (D011's permanence rule, not a whole-file scan). The fence itself
+    is down (D043): new rows may carry `ok`, and no gate is blocked on the registry."""
     rows = _tracked("RESULTS.tsv")
     if not rows:
         pytest.skip("no rows written yet")
-    assert not P.registry_is_empty()
-    assert {r["status"] for r in rows} == {"ok_provisional"}
-    assert {e["evidence_tier"] for e in _tracked("EXPERIMENTS.tsv")} <= {"SMOKE", "DEVELOPMENT"}
-    assert all(e["prototype"] == "true" for e in _tracked("EXPERIMENTS.tsv"))
+    assert P.registry_is_empty()
+    assert {r["status"] for r in rows} <= {"ok_provisional", "ok"}
 
 
 # -------------------------------------------------------------------------- the fence
@@ -242,8 +241,11 @@ def test_registry_and_decorators_agree_in_both_directions():
     assert decorated == set(P.PROVISIONAL)
 
 
-def test_the_gate_is_blocked_while_components_are_provisional():
-    assert not P.registry_is_empty()
+def test_the_gate_is_unblocked_now_the_registry_is_empty():
+    """D043: the last fenced component (`features.consensus_c`) was un-fenced after
+    the P3-04 chain reported what its hardening required. An empty registry is the
+    code-level condition the P0 gate always needed."""
+    assert P.registry_is_empty()
 
 
 def test_every_provisional_component_names_a_real_ledger_task():
@@ -269,19 +271,12 @@ def test_every_provisional_component_names_a_real_ledger_task():
         assert c.reason and c.hardening_requires
 
 
-def test_calling_a_provisional_component_records_it():
-    """A still-fenced component exercises the touched-tracking. (`discovery_sample_b`
-    was un-fenced at D041 after the replicate chain reported the draw's variance;
-    `consensus_c` remains fenced under P3-01.)"""
-    from cnmfbench.features import consensus_spectra_from_bank
+def test_decorating_an_unregistered_component_fails_loudly():
+    """With the registry empty, the fence machinery's remaining job is refusing
+    typos: a decorator naming an absent entry fails at import, never silently."""
 
-    P.reset_touched()
-    assert P.touched() == ()
-    import numpy as np
-    import pandas as pd
-    bank = pd.DataFrame(np.full((8, 3), 0.25))
-    consensus_spectra_from_bank(bank, 2, 2.0, 4, one_per_run=False)
-    assert "features.consensus_c" in P.touched()
+    with pytest.raises(KeyError, match="absent from PROVISIONAL"):
+        P.provisional("splits.outer_donor_folds")(lambda: None)
 
 
 def test_cited_rows_check_is_scoped_not_a_whole_file_scan():

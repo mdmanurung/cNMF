@@ -50,19 +50,6 @@ class ProvisionalComponent:
 PROVISIONAL = {
     c.component_id: c
     for c in [
-        ProvisionalComponent(
-            component_id="features.consensus_c",
-            owner_task="P3-01",
-            reason="Feature C reimplements upstream's consensus aggregation harness-side, "
-            "because `cnmf.py` may not be edited. Its OFF path is pinned against "
-            "`cnmf.consensus` by test, but only at the tiers run so far — and the "
-            "tie-breaking rule for which contribution survives (nearest the cluster "
-            "centroid) is a choice this implementation made, not a reading of the "
-            "ablation plan. See D015.",
-            hardening_requires="The OFF-path equivalence asserted at every tier a result "
-            "is claimed at, and the tie-break rule either fixed in the ablation plan or "
-            "shown not to change the C effect.",
-        ),
     ]
 }
 

@@ -1,0 +1,36 @@
+## M1-01 factorial + anchors + interaction report, 2026-09-19.
+##
+## With A/B/C all DROPPED at DEVELOPMENT, this milestone confirms no interaction
+## reverses a verdict rather than discovering a winner. All cells below read
+## pre-existing tracked rows (no new runs; nothing to confirm by re-running).
+##
+## ---- B×C INTERACTION: S(011)-S(010)-S(001)+S(000), per (fold, rank 7-10) ----
+## count-unit primary: base mean +0.04 sd 0.54 max 1.01 (margin scale 70)
+##                     C_dup mean -0.23 sd 0.29 max 0.81
+##                     C_sep  mean +0.01 sd 1.52 max 2.47
+## recovery cosine:    base max 6.3e-4, C_dup max 1.2e-3, C_sep max 5.8e-4 (margin 0.01)
+## No interaction approaches any margin. Verdicts stand independently.
+##
+## ---- A×anything: UNAVAILABLE BY DESIGN ----
+## A-ON rows exist only at ab960/ab48 budgets (P1-03); the factorial runs at
+## 1440/72/full-pool. Cross-budget interaction arithmetic would confound A with
+## sample size — the exact confound the programme refuses everywhere else.
+## A's DROP rests on its own paired comparison, not on interactions.
+##
+## ---- FULL-DATA ANCHOR (upstream_full_data applied to training folds) ----
+## p0-03-dev-feasibility rows (arm full_training_pool, same dataset 31b4cf0b):
+## K=7 count-unit primary outer_0 985.0 / outer_1 901.0 vs matched-budget 000
+## 990.5 / 903.5. Subsampling price ~0.5%, far below margin 70. The anchor and
+## the controlled comparator agree: neither the budget nor its removal moves
+## prediction meaningfully at this scale.
+##
+## ---- GENENMF ANCHOR: smoke only (registry/p0-09_genenmf_smoke.tsv). ----
+## No gene-set metric exists in §5.2, so no comparator row could be written
+## (SOURCE_AUDIT §2.3, deferred to a future P2-01-style amendment). Status
+## transparent: native workflow runs, converts, and is not compared.
+##
+## ---- FAILURES RETAINED ----
+## Upstream suite 37/38 (B004 scale-blind failure, diagnosed D005); feasibility
+## NO-GO × 2 (D012, D035); criterion attempt-1 infrastructure kill (reported in
+## prereg file); 4 P1-03 base reruns refused by the merge guard (already tracked).
+## All visible in DECISIONS.md, none worked around.

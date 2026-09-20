@@ -1,0 +1,27 @@
+## P3-04 C comparisons, 2026-09-19. 000v001 + 010v011, fixed K, identical banks.
+##
+## 12 DEVELOPMENT runs (base reruns + C_duplicate_merge + C_separated × 000/001/010/011),
+## all exit 0. Base reruns verified bit-reproducible vs tracked rows (worst rel diff
+## 5e-15, D004 tolerance 1e-5) but NOT merged — the merge guard correctly refused
+## already-tracked ids; base comparisons read pre-existing tracked rows. The 8 C-scenario
+## runs merged cleanly. Identical-bank assertion: 84/84 C pairs share factor_bank_hash.
+##
+## ---- NO-OP at/below K_true (contract's primary structural claim) ----
+## C-ON == C-OFF bitwise at K=7 on every endpoint, both folds, all 3 scenarios
+## (e.g. base recovery 0.9823/0.9823, 0.9838/0.9838). The constraint never binds there.
+##
+## ---- EFFECT at K>K_true (training-scale prediction, equal-donor mean) ----
+## 000v001 and 010v011 agree in direction; ON minus OFF:
+## base:        k8 +2.7/+0.6,  k9 +2.7/+0.6,  k10 +2.8/+0.6   (margin 30: no gain)
+## C_duplicate: k8 +0.0/+0.0,  k9 +0.2/+0.1,  k10 +0.8/+0.1   (target regime: flat)
+## C_separated: k8 +0.0/+0.0,  k9 +0.5/+0.1,  k10 +0.2/+0.1   (no-harm control holds)
+## C never improves prediction anywhere (12/12 cells ON >= OFF).
+##
+## ---- RECOVERY (harm margin 0.01): ON-vs-OFF in [-0.0015, 0.0] everywhere. No gain, no breach. ----
+## ---- USAGE (harm margin 0.05): worst +0.034 (C_dup k10 outer_0). No breach. ----
+## ---- COST (cap 5x): same-session pairs 0.96-1.04x. Pass. (Base pair mixes sessions; not compared.) ----
+## ---- PROVENANCE: retained/omitted counts + distinct-run counts in consensus_info per (fold,K); banks identical. ----
+##
+## software_status	PASS	(12/12 exit 0; OFF-path pinned; no-op + NaN tests green)
+## scientific_adoption	see gate P3 (P3-05)
+## evidence_tier	DEVELOPMENT (fixed rank; nothing promoted)

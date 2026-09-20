@@ -27,8 +27,6 @@ Feature C inserts one step between 3 and 4, and changes nothing else.
 import numpy as np
 import pandas as pd
 
-from .provisional import provisional
-
 __all__ = [
     "LOCAL_NEIGHBORHOOD_SIZE",
     "run_of",
@@ -80,7 +78,6 @@ def local_density(l2_values, n_neighbors):
     return nearest.sum(1) / n_neighbors
 
 
-@provisional("features.consensus_c")
 def consensus_spectra_from_bank(merged_spectra, k, density_threshold, n_iter,
                                 one_per_run=False):
     """Aggregate a factor bank into `median_spectra`. `one_per_run` is feature C.

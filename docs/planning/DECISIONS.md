@@ -958,6 +958,69 @@ not reused on trust).
 Protocol/data versions superseded: none.
 Independent confirmation needed: no.
 
+## D043 — P3-04/05: C DROPPED (never helps, tiny harm-direction); fence EMPTY
+
+Date/time: 2026-09-19, P3-04/05 session
+Type: scientific adoption + implementation
+Related task, feature, gate: P3-04, P3-05, gate P3, feature C
+Context: 12 DEVELOPMENT runs (base reruns + C_duplicate_merge + C_separated ×
+000/001/010/011). Base reruns reproduce tracked rows to 5e-15 relative
+(worst case — ten orders inside D004), so the comparison reads pre-existing
+tracked rows for base and merges only the 8 C-scenario runs; the merge guard
+correctly refused the already-tracked base ids (reported, not bypassed).
+Identical-bank assertion: 84/84 C pairs hash-equal.
+Findings: no-op bitwise at/below K_true everywhere (structural claim holds);
+above K_true C never improves prediction (12/12 cells ON≥OFF, deltas ≤+2.8 vs
+margin 30 — including ≤+0.8 in the duplicate-merging target), recovery harm
+≤0.0015 (margin 0.01), usage harm ≤0.034 (margin 0.05), cost 0.96–1.04× same
+session (cap 5×). Fence: `features.consensus_c` un-fenced (decorator + entry
+removed together; OFF-path pinned, no-op + NaN properties tested, tie-break
+frozen and measured) — `registry_is_empty()` true for the first time; the
+three fence-transition tests rewritten to the empty-registry world
+(historical rows stay provisional permanently; unknown decorator ids raise).
+Decision: **DROP** — no worthwhile benefit in any regime including the target,
+with small consistent harm-direction above K_true. Default (upstream median)
+remains. Scope: DEVELOPMENT fixed-rank centroid-nearest; mean-vote stays
+deferred. 100/101+110/111 omitted (would measure dropped-A harm).
+Evidence paths and experiment IDs: `registry/p3-04_c_comparisons.tsv`;
+`gates/P3.md`; 276 non-slow tests pass (full suite at commit).
+Trade-offs and negative evidence: subgroup/rare-program C effects unmeasured
+(no metric — same gap as A/B); real-data scale untouched. The DROP does not
+cover those, and neither does any positive claim.
+Consequences: P3-04/P3-05 DONE; M1-01 (factorial + anchors + interactions) next.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no (DROP on development evidence).
+
+## D044 — B004 extended: upstream suite is 36/38, both failures the same diagnosed class
+
+Date/time: 2026-09-19, M1-03 session
+Type: implementation (upstream finding, not a regression)
+Related task, feature, gate: M1-03, gate P0 (carried expectation)
+Context: P0-01 recorded 37/38 with only the simulated `gene_spectra_tpm`
+failing (B004: upstream's absolute-SSE tolerance on a TPM-scale matrix). The
+M1-03 re-run gives 36/38: PBMC `gene_spectra_tpm.k_7` now fails too
+(SSE 0.0035 vs budget 1e-4), while consensus spectra (0.0), usages (~3e-10)
+and gene_spectra_score (1e-15) still pass.
+Elimination performed before recording (not after concluding): `src/`,
+`tests/`, `pyproject.toml` byte-identical to the pinned SHA; all 148
+`tests/test_data` files match the P0-01 manifest; locked env versions match
+running versions (scanpy 1.11.5, sklearn 1.7.2, numpy 2.2.6, scipy 1.15.3,
+anndata 0.11.4); fails identically with and without BLAS thread caps and in
+isolation (not test-order); back-to-back runs bitwise identical (deterministic
+now). The harness cannot be involved — it never executes this path (the test
+copies the reference bank and runs upstream `prepare`+`consensus` only).
+Remaining honest position: same failure class as B004 (absolute SSE budget on
+TPM-scale matrices — 0.0035 SSE is ~1e-6 relative, scientifically exact, same
+as D005's 0.0718-at-1.4e-6), now on both datasets. Why P0-01's PBMC run read
+RMS 0.0 is UNRESOLVED — stated as unresolved, not papered over; candidates
+(thread regime, global-RNG residue) were tested and excluded one by one above.
+Consequences: the carried upstream expectation becomes 36/38 with two named
+expected failures of one diagnosed class. No benchmark conclusion moves: the
+harness measures in relative Frobenius (D004) and every harness cNMF invocation
+goes through the identical pinned pipeline.
+Protocol/data versions superseded: none.
+Independent confirmation needed: none required for this cycle (upstream finding).
+
 ## Entry template
 
 ### D<id> — <title>

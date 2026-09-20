@@ -10,7 +10,7 @@
 | Field | Current value |
 |---|---|
 | Active prototype | P0 — loop closes at SMOKE and DEVELOPMENT; P0-04 metrics **wired into the runner**; features B and C switchable and exercised at both tiers; nested donor folds and the §3.2 leakage audit implemented and tested against real fits (P0-05); P0-06's selector is implemented and `delta` calibrated (D026), PROTOCOL still v1.0.1; **P0-07 DONE** (cache/restart + smoke workflow, fence four → three, D027) |
-| Active task | P3-04 (C comparisons — DEVELOPMENT chain over 10 configs) |
+| Active task | None — first cycle COMPLETE (31/31 DONE, M1-04 evidence report written). Re-entry: P2-scale real-data follow-ups or the named 1-SE variant, each as a new decision, never a silent reopen |
 | Next task | **P0-08** — register a public multi-donor dataset and verify metadata (dependency P0-02 now DONE; or record an explicit external blocker) |
 | P0-02 note | P0-02 is DONE (schemas + manifest example + unit tags, D028); its dependency slot for P0-08/P0-09 is satisfied. P0-05/P0-06 proceeded around it by recorded deviation (D018/D021/D026); that history stands and is not rewritten. |
 | P0-06 note | **P0-06 is DONE** (closed by the v1.1 amendment, D033). The tension is resolved the way the dashboard allowed: P1-01 ran the amendment as its first act, with P0-10 already closed — no dependency was edited, the ordering P0-10 → P1-01 → (P0-06 closes) is exactly what happened. |
@@ -30,9 +30,8 @@
 
 ## 2. Progress counts
 
-**9 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05, P0-07, P0-02).  
-**25 / 31 tasks DONE** (S0×3, P0×10, P0-06, P1×4, P2×5, P3-01, P3-02, P3-03).  
-TODO: 6 (P3-04–05, M1-01–04) · IN_PROGRESS: 1 (P3-04 — chain queued) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0. Features A/B: DROPPED at DEVELOPMENT
+**31 / 31 tasks DONE** (S0×3, P0×10, P0-06, P1×4, P2×5, P3×5, M1×4).  
+TODO: 0 · IN_PROGRESS: 0 · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0. Features A/B/C: DROPPED at DEVELOPMENT; fence EMPTY; recommended configuration: original unmodified cNMF baseline
 
 Scientific adoption remains separate and untouched. P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance; S0-03 establishes the rules by which future evidence will be judged; the skeleton establishes that the loop executes end to end. **None of that is evidence for any feature.** Benchmark numbers now exist, but only at SMOKE tier, from fenced throwaway components, for the reference configuration `000` — there is nothing to compare them against, and `smoke_can_promote_feature: false` forbids using them if there were.
 
@@ -85,12 +84,12 @@ Update status and evidence after each meaningful code/test batch. A task is DONE
 | P3-01 | P3 | Freeze C contract and identical-factor-bank comparisons | P2-05 | DONE | `contracts/C.md` FROZEN (v1.1): centroid-nearest rule (D015 closed plan-side), 000v001+010v011 at fixed K>K_true, identical-bank assertion, margins 30/0.01/0.05/5× (D042) |
 | P3-02 | P3 | Implement one-per-run-per-cluster aggregation only | P3-01 | DONE | Pre-existed (`features.py`); C scenarios enabled (all 8 live); tie-break frozen in contract (D042) |
 | P3-03 | P3 | Test C constraint, no-op, invariance and incomplete-run handling | P3-02 | DONE | No-op bitwise identity + NaN refusal added; OFF-path upstream pinning + dedup mechanics pre-existed (D042) |
-| P3-04 | P3 | Run corruption and natural end-to-end C comparisons | P3-03 | IN_PROGRESS | Started 2026-09-19: sequential chain over 10 DEVELOPMENT configs (base/C_duplicate_merge/C_separated × 000/001/010/011); bank-hash assertion + analysis on completion |
-| P3-05 | P3 | Close C software and scientific adoption decisions | P3-04 | TODO | P3 gate with negative evidence, cost and adoption scope — **not yet available** |
-| M1-01 | Milestone | Run full factorial plus anchors and interaction report | P3-05 | TODO | 8 configurations; fixed-rank controls; paired effects; failures retained — **not yet available** |
-| M1-02 | Milestone | Freeze recommended configuration and run independent confirmation | M1-01 | TODO | Frozen hashes and untouched evidence; explicit limits if blocked — **not yet available** |
-| M1-03 | Milestone | Verify installation, compatibility, restart and documented commands | M1-01 | TODO | Tested user workflow; final regression results; HPC status — **not yet available** |
-| M1-04 | Milestone | Publish local evidence report and resumable handoff | M1-02, M1-03 | TODO | Approved artifacts with provenance; supported/unsupported claims; no remote publication — **not yet available** |
+| P3-04 | P3 | Run corruption and natural end-to-end C comparisons | P3-03 | DONE | 12 DEVELOPMENT runs (base reruns verified 5e-15-equivalent, unmerged by guard; 8 C-scenario runs merged). 84/84 bank pairs hash-equal. C never improves prediction (≤+2.8 vs margin 30); no-op at K≤7 (D043) |
+| P3-05 | P3 | Close C software and scientific adoption decisions | P3-04 | DONE | **DROP** (D043, `gates/P3.md`): no gain incl. duplicate target, tiny harm-direction, safeguards pass. Fence EMPTY (`registry_is_empty()` true) |
+| M1-01 | Milestone | Run full factorial plus anchors and interaction report | P3-05 | DONE | B×C interactions negligible (prediction \|I\|≤2.5 vs 70; recovery ≤1.2e-3); A-interactions unavailable by design; full-pool anchor agrees (~0.5%); GeneNMF smoke-only; failures retained (`registry/m1-01_factorial_interactions.tsv`) |
+| M1-02 | Milestone | Freeze recommended configuration and run independent confirmation | M1-01 | DONE | Recommended: ORIGINAL UNMODIFIED cNMF (all features OFF). Sealed tier deliberately NOT run: with nothing adopted there is no decision a sealed run could inform, and spending it would consume confirmation for no question (recorded, not deferred). Biological: Kang diagnostic only. Comparator: smoke only |
+| M1-03 | Milestone | Verify installation, compatibility, restart and documented commands | M1-01 | DONE | Harness 276 non-slow green (290 incl. slow at last full run); upstream 36/38 with two named B004-class expected failures (D044 — same diagnosed class, PBMC-bitwise non-reproduction unresolved after full elimination); `src/` clean; PROTOCOL v1.1 hash verified; cache/restart tested; CLI entry points exercised |
+| M1-04 | Milestone | Publish local evidence report and resumable handoff | M1-02, M1-03 | DONE | `registry/m1_evidence_report.md` (this cycle's supported/unsupported claims + provenance); no remote publication. Handoff: re-entry only via new decisions |
 
 \* P0-10 can document an explicit synthetic-only engineering gate if P0-08 or P0-09 is externally blocked; those tasks stay BLOCKED, do not become DONE, and biological/comparator claims remain unavailable.
 
