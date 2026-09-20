@@ -79,8 +79,11 @@ def test_selected_rank_row_gets_a_distinct_id_but_fixed_ids_do_not_move():
     # Pinned: the fixed-rank id is bit-identical to the pre-P1-02 scheme, which
     # knew no selected_rank parameter. If this literal changes, an identifier
     # that existing tracked rows depend on has moved.
-    assert fixed == "100-matched_budget-d-ab48-outer_0-k3-2065137a288d"
-    assert selected == "100-matched_budget-d-ab48-sel3-outer_0-k3-76fa9ed354a8"
+    # (Re-pinned at v1.2/D045: PROTOCOL_VERSION 1.0.1→1.2 enters the payload, so
+    # all v1.2-era ids live in a new identity domain BY DESIGN; v1.0.1/1.1 ids in
+    # tracked TSVs are unaffected because no existing row is regenerated.)
+    assert fixed == "100-matched_budget-d-ab48-outer_0-k3-13bf0015f745"
+    assert selected == "100-matched_budget-d-ab48-sel3-outer_0-k3-f9ac8b459175"
 
 
 @pytest.mark.slow
