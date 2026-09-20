@@ -1,0 +1,54 @@
+# P2-04 B comparison (P2-02 generated). B_balanced 010, sampling replicate 2/3.
+# Shared budget 1440; variant rep2 distinguishes replicate ids (D014 pattern).
+schema_version: 1
+profile: development
+evidence_tier: DEVELOPMENT
+allow_scientific_promotion: false
+seed: 90210
+scenario: B_balanced
+simulation:
+  donors: 24
+  cells_per_donor: 200
+  genes: 2000
+  true_programs: 7
+  observation_model: poisson
+  independent_replicates: 1
+factorization:
+  backend: pinned_upstream_cnmf
+  loss: frobenius
+  candidate_ranks:
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  optimizer_starts: 10
+  max_optimizer_iterations: 300
+  num_highvar_genes: 1200
+  density_threshold: 2.0
+validation:
+  outer_donor_folds: 2
+  inner_donor_folds: 2
+  inference_gene_fraction: 0.5
+  panel_seed: 20260918
+  panel_repetitions: 5
+  projection: nonnegative_least_squares_frozen_dictionary
+  transform: training_fitted_and_leakage_audited
+resources:
+  cores: 2
+  blas_threads_per_job: 1
+  memory_limit_mb: 8192
+features:
+  A: false
+  B: true
+  C: false
+source_pins:
+  cnmf_full_commit_sha: 5dbc5baaa0b9079b55bce554d801caa235a50457
+  genenmf_full_commit_sha: null
+discovery:
+  arm: matched_budget
+  cell_budget: 1440
+  sampling_seed: 424244
+variant: rep2

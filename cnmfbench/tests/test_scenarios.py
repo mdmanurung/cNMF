@@ -22,8 +22,9 @@ def test_all_eight_scenarios_are_specified():
     assert len(SCENARIOS) == 8
 
 
-def test_exactly_the_three_planned_scenarios_are_implemented():
-    assert set(list_implemented()) == {"base_identifiable", "A_weak", "A_null"}
+def test_exactly_the_six_planned_scenarios_are_implemented():
+    assert set(list_implemented()) == {"base_identifiable", "A_weak", "A_null",
+                                       "B_imbalanced", "B_balanced", "B_context"}
 
 
 def test_every_scenario_states_which_feature_it_tests():
@@ -33,10 +34,10 @@ def test_every_scenario_states_which_feature_it_tests():
 
 
 def test_unimplemented_scenario_raises_rather_than_falling_back():
-    # A silent fallback would produce a RESULTS.tsv row labelled B_context that was
+    # A silent fallback would produce a RESULTS.tsv row labelled C_separated that was
     # generated under base_identifiable, and nothing downstream could detect it.
     with pytest.raises(NotImplementedError):
-        get_scenario("B_context")
+        get_scenario("C_separated")
 
 
 def test_unknown_scenario_raises():
@@ -49,7 +50,8 @@ def test_unknown_tier_raises():
         build_params("base_identifiable", "PRODUCTION")
 
 
-@pytest.mark.parametrize("name", ["base_identifiable", "A_weak", "A_null"])
+@pytest.mark.parametrize("name", ["base_identifiable", "A_weak", "A_null",
+                                   "B_imbalanced", "B_balanced", "B_context"])
 @pytest.mark.parametrize("tier", ["SMOKE", "DEVELOPMENT"])
 def test_implemented_scenarios_build_valid_params(name, tier):
     p = build_params(name, tier)

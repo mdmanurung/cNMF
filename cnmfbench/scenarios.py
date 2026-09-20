@@ -1,4 +1,4 @@
-"""The scenario registry: all 8 specified now, 3 implemented.
+"""The scenario registry: all 8 specified now, 6 implemented (B trio at P2-02).
 
 All eight are specified **before features B and C exist**, so that no scenario can be
 shaped around the behaviour of the feature it is meant to test. That is the whole point
@@ -154,7 +154,7 @@ SCENARIOS = {
         ),
     ),
     "B_imbalanced": dict(
-        implemented=False,
+        implemented=True,
         feature="B",
         overrides=dict(cells_per_donor_cv=0.8),
         rationale=(
@@ -163,7 +163,7 @@ SCENARIOS = {
         ),
     ),
     "B_balanced": dict(
-        implemented=False,
+        implemented=True,
         feature="B",
         overrides=dict(cells_per_donor_cv=0.0),
         rationale=(
@@ -172,7 +172,7 @@ SCENARIOS = {
         ),
     ),
     "B_context": dict(
-        implemented=False,
+        implemented=True,
         feature="B",
         overrides=dict(activity_donor_eligibility=0.35, cells_per_donor_cv=0.8),
         rationale=(

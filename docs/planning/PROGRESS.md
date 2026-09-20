@@ -10,7 +10,7 @@
 | Field | Current value |
 |---|---|
 | Active prototype | P0 — loop closes at SMOKE and DEVELOPMENT; P0-04 metrics **wired into the runner**; features B and C switchable and exercised at both tiers; nested donor folds and the §3.2 leakage audit implemented and tested against real fits (P0-05); P0-06's selector is implemented and `delta` calibrated (D026), PROTOCOL still v1.0.1; **P0-07 DONE** (cache/restart + smoke workflow, fence four → three, D027) |
-| Active task | P2-01 (freeze B contract + matched-budget sampling policy — first milestone P1 complete: A DROPPED) |
+| Active task | P2-04 (B comparisons — 24-run DEVELOPMENT replicate chain) |
 | Next task | **P0-08** — register a public multi-donor dataset and verify metadata (dependency P0-02 now DONE; or record an explicit external blocker) |
 | P0-02 note | P0-02 is DONE (schemas + manifest example + unit tags, D028); its dependency slot for P0-08/P0-09 is satisfied. P0-05/P0-06 proceeded around it by recorded deviation (D018/D021/D026); that history stands and is not rewritten. |
 | P0-06 note | **P0-06 is DONE** (closed by the v1.1 amendment, D033). The tension is resolved the way the dashboard allowed: P1-01 ran the amendment as its first act, with P0-10 already closed — no dependency was edited, the ordering P0-10 → P1-01 → (P0-06 closes) is exactly what happened. |
@@ -31,8 +31,8 @@
 ## 2. Progress counts
 
 **9 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05, P0-07, P0-02).  
-**17 / 31 tasks DONE** (S0-01, S0-02, S0-03, P0-01, P0-03, P0-04, P0-05, P0-07, P0-02, P0-08, P0-09, P0-10, P0-06, P1-02, P1-01, P1-03, P1-04).  
-TODO: 14 (P2-01–05, P3-01–05, M1-01–04) · IN_PROGRESS: 0 · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0. Feature A: DROPPED at DEVELOPMENT (adoption scope, not a task state); P2-01 next
+**20 / 31 tasks DONE** (S0×3, P0×10, P0-06, P1×4, P2-01, P2-02, P2-03).  
+TODO: 11 (P2-04–05, P3-01–05, M1-01–04) · IN_PROGRESS: 1 (P2-04 — replicate chain running) · VERIFY: 0 · BLOCKED: 0 · DROPPED: 0. Feature A: DROPPED at DEVELOPMENT
 
 Scientific adoption remains separate and untouched. P0-01 establishes that the measuring apparatus runs and that upstream reproduces within a declared tolerance; S0-03 establishes the rules by which future evidence will be judged; the skeleton establishes that the loop executes end to end. **None of that is evidence for any feature.** Benchmark numbers now exist, but only at SMOKE tier, from fenced throwaway components, for the reference configuration `000` — there is nothing to compare them against, and `smoke_can_promote_feature: false` forbids using them if there were.
 
@@ -77,10 +77,10 @@ Update status and evidence after each meaningful code/test batch. A task is DONE
 | P1-02 | P1 | Implement inner-validation rank selector as independent A switch | P1-01 | DONE | D020(1–7) built; `read_delta` + A admission; both selectors emit paired selected-rank rows reusing fixed fits (D034). 11 tests; 275 pass. Fence kept: first real A-ON run (P1-03) un-fences |
 | P1-03 | P1 | Run A target/safeguard and regression comparisons | P1-02 | DONE | Base pair (000/100 ab960): A selects 10/7 vs baseline 7/7; Δ+1.07/0.0 (margin 30). A_weak pair: A 10/10 vs baseline 5/6; Δ+1.38/+1.65. Recovery harm in 3/4 folds; cost ≤2.6×. First real A-ON run un-fenced inner loop (D036) |
 | P1-04 | P1 | Close A software and scientific adoption decisions | P1-03 | DONE | **DROP** (D037, `gates/P1.md`): no gain (best Δ 0.0 vs margin 30), recovery/usage harm in 3/4 folds, cost pass, rare NOT_SET. Scope: DEVELOPMENT min-loss selection. 1-SE variant named, not built |
-| P2-01 | P2 | Freeze B contract and matched-budget sampling policy | P1-04 | TODO | contracts/B.md; equal versus proportional budgets; full-data anchor — **not yet available** |
-| P2-02 | P2 | Implement B with common preprocessing and frozen discovery sets | P2-01 | TODO | Independent B switch; saved discovery IDs and shared preprocessor hashes — **not yet available** |
-| P2-03 | P2 | Test budgets, refit isolation and context-preservation safeguards | P2-02 | TODO | No test refits; no full-pool V updates; deterministic sampling tests — **not yet available** |
-| P2-04 | P2 | Run balanced/imbalanced/subgroup B comparisons | P2-03 | TODO | 000/010 and 100/110; fixed and selected rank; all prior regressions — **not yet available** |
+| P2-01 | P2 | Freeze B contract and matched-budget sampling policy | P1-04 | DONE | `contracts/B.md` FROZEN (v1.1): margins 70/0.01/0.05/5×, subgroup NOT_SET; 3 replicates/arm via variant rep{r}; redistribution blessed; anchor defined; regimes ordered (D038) |
+| P2-02 | P2 | Implement B with common preprocessing and frozen discovery sets | P2-01 | DONE | B trio enabled (generative only) + measured (D039); 24 DEVELOPMENT replicate configs + SMOKE pair, script-generated |
+| P2-03 | P2 | Test budgets, refit isolation and context-preservation safeguards | P2-02 | DONE | Determinism/seed-sensitivity/exact-budget/redistribution/over-budget-refusal unit tests + SMOKE imbalanced pair with byte-identical G (`test_discovery.py`, D039) |
+| P2-04 | P2 | Run balanced/imbalanced/subgroup B comparisons | P2-03 | IN_PROGRESS | Started 2026-09-19: sequential background chain over the 24 replicate configs (base → imbalanced → balanced → context); merge + analyze on completion |
 | P2-05 | P2 | Close B software and scientific adoption decisions | P2-04 | TODO | P2 gate and conditional activation rule if warranted — **not yet available** |
 | P3-01 | P3 | Freeze C contract and identical-factor-bank comparisons | P2-05 | TODO | contracts/C.md; factor-bank reuse hashes; one-pass C definition — **not yet available** |
 | P3-02 | P3 | Implement one-per-run-per-cluster aggregation only | P3-01 | TODO | C switch; provenance of retained/omitted factors; unchanged surrounding steps — **not yet available** |

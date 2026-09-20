@@ -1,9 +1,9 @@
 # Feature contract — B (donor-balanced discovery)
 
-Status: DRAFT — endpoints named and their *units* fixed; margins still NOT_SET
-Protocol version/hash: v1.0.1, `715639895663bc74e7b864bc1cfae60c2fcd05b013e25f23016d45e86f4f9ca5`
-Code/environment revision: harness `328238e`, upstream `5dbc5baaa0b9079b55bce554d801caa235a50457` (`src/cnmf/**` unmodified)
-Evidence tier: NONE for adoption. SMOKE evidence exists and is INCONCLUSIVE by construction.
+Status: FROZEN at P2-01 (v1.1) — hypothesis, units, endpoints, margins, sampling policy and anchor fixed below; changing any after seeing a B-ON row creates a new protocol version
+Protocol version/hash: v1.1, `cc5241076a6c3e5f98b7575f0b09b12337c119e6ddaea685514692ebc9d42ec9`
+Code/environment revision: harness `1064712`, upstream `5dbc5baaa0b9079b55bce554d801caa235a50457` (`src/cnmf/**` unmodified)
+Evidence tier: NONE for adoption. SMOKE + DEVELOPMENT A-OFF evidence exists and informs design only.
 
 ## Why this file exists now, before the DEVELOPMENT factorial is read
 
@@ -100,21 +100,63 @@ feature B does in deployment** — a practitioner running donor-balanced discove
 donor-balanced scale too — but it is a property of the intervention, not a controlled
 comparison, and no B result may be reported as if it had been controlled for.
 
-## Margins
+## Margins (frozen P2-01 on DEVELOPMENT 000 controls, K_true=7)
 
-`NOT_SET`, all of them. No adoption decision may cite any B number until they are set, and
-they may not be set after seeing a confirmation result. `smoke_can_promote_feature: false`.
+| Role | Metric and exact definition | Direction | Decision margin | Evidence used to set margin |
+|---|---|---|---|---|
+| Primary | `heldout_squared_prediction_error_counts_v1`, equal-donor mean (count units — the only shared reference, §units above) | Lower (010 vs 000) | **70** (count units) | 3× donor-level SE (22.88, n=48 donor-rows) in DEVELOPMENT 000 controls; mean 945, so ~7% — same relative scale as A's margin by construction, not by copying |
+| Safeguard: program recovery | `program_recovery_cosine_v1` in count space, beside matched null | Higher | **max harm 0.01** | Same basis as A (experiment SE 0.0008 on n=2 folds — thin, stated); small vs the 0.15 fit–null gap |
+| Safeguard: usage | `usage_error_v1` | Lower | **max harm 0.05** | 3× experiment SE (0.0106 → 0.032), rounded up |
+| Safeguard: subgroup preservation | B_context rare-program recovery | Higher | **NOT_SET — no rare-program metric exists** | Blocks adoption on this safeguard until defined (same rule as A); P2-05 may close CONDITIONAL on the imbalanced regime with INCONCLUSIVE on context, never by inventing comparability |
+| Safeguard: cost/failures | `wall_seconds_v1`, `failed_fits_v1` | Lower | **5× the paired 000 wall** | B draws the same cell budget through the same fits, so cost should be ~1×; 5× sits above observed ±40% BLAS noise (D024) and below absurdity. Tighter than A's 25× because B adds runs, not fits |
 
-## What would have to be true for B to be adopted
+**Observed pilot B effect (not a result):** at K_true=7 on balanced DEVELOPMENT
+controls, 010 vs 000 differs by +1.8/+1.9 count units (~0.2%, far below margin
+70) — expected, since with `cells_per_donor_cv=0` equal-per-donor and
+proportional draws are near-identical. `base_identifiable` is therefore B's
+**no-harm control**, not its target regime; the target is `B_imbalanced`.
 
-Named here so the bar is visible before the evidence is:
+## Frozen sampling policy
 
-1. A pre-registered margin on `heldout_squared_prediction_error_counts_v1`.
-2. Sampling replicates, so the draw's own variance is reported rather than assumed
-   negligible — currently a single draw per arm, which is why SMOKE is INCONCLUSIVE and not
-   "no effect". See `features.discovery_sample_b` in `cnmfbench/provisional.py`.
-3. The redistribution rule for donors holding fewer cells than their equal share either fixed
-   in the ablation plan or shown not to change the B effect.
-4. A cross-arm audit asserting `G` identical and **reporting** the `s_g` drift rather than
-   asserting it away — the assertion in the fence entry's `hardening_requires` cannot be met
-   as written and is superseded by this file.
+- **Budgets:** one total cell budget per tier/scenario, identical across arms
+  (SMOKE 72, DEVELOPMENT 1440 — the existing factorial budgets; A-pair budgets
+  ab48/ab960 are a separate comparison and stay out of B rows). B-OFF draws
+  `proportional_without_replacement`, B-ON `equal_per_donor_without_replacement`.
+- **Replicates:** 3 sampling replicates per arm (r=0,1,2). Replicate r uses
+  `sampling_seed = base + r` and `variant: rep{r}` (variant distinguishes the
+  `experiment_id`s, D014 pattern — the seeds dict in the id is untouched so
+  existing ids never move). The draw's variance is reported across replicates,
+  never assumed negligible (this closes fence item 2 of §"What would have to be
+  true" above).
+- **Redistribution rule:** the implemented shortfall redistribution (donors
+  below equal share contribute all cells, remainder redistributed over donors
+  with spare cells; `features.discovery_sample`) is blessed as the frozen
+  policy — deterministic given seed, arms always exactly budget-matched
+  (asserted, not assumed). Closes fence item 3 without touching frozen files.
+- **Shared preprocessing:** G frozen once per fold on the full training pool
+  via `prepare(genes_file=...)`, byte-identical across arms (verified, D016);
+  `s_g` drifts by construction and all cross-arm endpoints stay in count units.
+- **Discovery set frozen** across ranks and optimizer seeds within an
+  experiment; sampling varies only through the replicate index.
+- **Full-data anchor:** one `000` run per tier/scenario with no discovery
+  section (`arm: full_training_pool`, every training cell) — the practical
+  anchor. The matched-budget 000 is the controlled comparator; the two are
+  never averaged or interchanged (D010).
+
+## Regimes (P2-04)
+
+`base_identifiable` (no-harm control: B should change nothing) →
+`B_imbalanced` (target: `cells_per_donor_cv=0.8`, B should improve recovery) →
+`B_balanced` (matched control, cv=0) → `B_context` (subgroup preservation
+safeguard). The latter three scenarios are `implemented=False` today; P2-02
+implements them in the simulator (generative parameters only — no inference
+change, no protocol change).
+
+## What had to be true for B to be adopted (P2-01 discharge)
+
+1. ✅ Margin on count-unit prediction: **70**, frozen above.
+2. ✅ Sampling replicates: 3/arm frozen in sampling policy above (P2-02 builds them).
+3. ✅ Redistribution rule frozen above (implemented rule blessed, arms exactly matched).
+4. ✅ Cross-arm audit: G identical asserted; `s_g` drift reported (median 1.04, max 1.24), never asserted away — plus v1.1 §3.4 settles the primary-loss scope.
+
+Remaining NOT_SET: subgroup-preservation margin (no metric exists — see margins table).

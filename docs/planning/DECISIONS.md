@@ -827,6 +827,69 @@ Consequences: feature A stays OFF; P2-01 next.
 Protocol/data versions superseded: none.
 Independent confirmation needed: no (DROP on development evidence; nothing promoted).
 
+## D038 — P2-01: B contract frozen — margins, replicates, redistribution, anchor
+
+Date/time: 2026-09-19, P2-01 session
+Type: protocol (contract freeze; no PROTOCOL.md change — v1.1 stays)
+Related task, feature, gate: P2-01, feature B
+Context: `contracts/B.md` carried units + hypothesis since the SMOKE audit but
+null margins, one draw per arm, an unblessed redistribution rule and no anchor
+definition. All four are frozen here, before any B-ON DEVELOPMENT comparison
+beyond the existing single-draw rows (which predate the margins and are
+grandfathered as pilot data, never adoption evidence).
+Decision: margins from DEVELOPMENT 000 pilot variability at K_true=7 —
+primary 70 (3× donor SE 22.88, ~7%), recovery harm 0.01, usage harm 0.05,
+cost cap 5× paired wall (tighter than A's: B adds runs, not fits),
+subgroup NOT_SET (no metric; blocks adoption on that safeguard). Policy:
+shared tier budgets (72/1440), 3 sampling replicates per arm via
+`sampling_seed=base+r` + `variant: rep{r}` (existing id digests untouched),
+redistribution rule blessed as implemented, G frozen + count-unit endpoints
+(D016/v1.1 §3.4), full-pool 000 as practical anchor distinct from
+matched-budget 000 (D010). Regimes ordered: base (no-harm control — with
+cv=0 the two draws are near-identical, pilot Δ +1.8/+1.9 confirms) →
+B_imbalanced (target) → B_balanced → B_context (safeguard).
+Evidence paths and experiment IDs: `contracts/B.md` (frozen); pilot numbers
+recomputed from tracked TSVs this session (commands in session, same queries
+as the A-margin session).
+Trade-offs and negative evidence: B_imbalanced/B_balanced/B_context are
+`implemented=False` — P2-02 builds them (generative only). Recovery SE rests
+on n=2 folds (thin, stated). The existing single-draw 000/010 DEVELOPMENT rows
+cannot address draw variance; P2-04 reruns at 3 replicates.
+Consequences: P2-01 DONE; P2-02 implements scenarios + replicate configs.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
+## D039 — P2-02/03: B scenarios live, replicates generated, safeguards tested
+
+Date/time: 2026-09-19, P2-02/03 session
+Type: implementation
+Related task, feature, gate: P2-02, P2-03, feature B
+Context: B_imbalanced/B_balanced/B_context were specified-but-raising; the
+runner had no replicate convention; discovery safeguards were partially tested.
+Decision and build:
+- Scenarios enabled (generative overrides only — `cells_per_donor_cv`,
+  `activity_donor_eligibility` — no inference or protocol change):
+  `test_b_scenarios.py` measures spread (max/min ≥ 2), evenness, and subgroup
+  restriction (activity exactly absent outside carriers) at SMOKE.
+- 26 configs generated (scripted, not hand-written): SMOKE imbalanced pair
+  (execution + G-identity) and 24 DEVELOPMENT replicate configs (4 scenarios
+  × 2 arms × rep0–2, budget 1440, `sampling_seed=424242+r`, `variant: rep{r}`).
+  Dry-run validates preconditions on a new scenario.
+- Safeguards (`test_discovery.py`): draw determinism, seed sensitivity,
+  exact budget match both arms, shortfall redistribution (6+2=8 on 10+2),
+  over-budget refusal, plus the SMOKE imbalanced pair executing with
+  byte-identical frozen G across arms and `ok_provisional` throughout.
+- `test_scenarios.py` updated to the 6-implemented world (C pair still raises).
+Evidence paths and experiment IDs: full suite green (see commit check);
+`docs/benchmarks/configs/development_*{base,B_*}_rep{0,1,2}.yaml`.
+Trade-offs and negative evidence: 24 DEVELOPMENT runs (~2–4 h sequential) are
+queued for P2-04 — the price of the replicate policy P2-01 froze. The fence
+entry stays: replicates must be *run*, not merely generatable, before the
+draw's variance is reported.
+Consequences: P2-02/P2-03 DONE; P2-04 runs the chain.
+Protocol/data versions superseded: none.
+Independent confirmation needed: no.
+
 ## Entry template
 
 ### D<id> — <title>
